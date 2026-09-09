@@ -6,6 +6,8 @@ Research software for designing and validating conservative NGG-compatible guide
 
 **Run the OpenCRISPR-1 app:** https://opencrispr1-grna-designer.onrender.com/
 
+**Give feedback:** https://github.com/abdulbasitbehlim/OpenCRISPR1-gRNA-Designer/issues/new?template=feedback.yml
+
 **GitHub repository:** https://github.com/abdulbasitbehlim/OpenCRISPR1-gRNA-Designer
 
 **Also available — Plant MultiGene gRNA Designer:**
