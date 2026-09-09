@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the archived release once a DOI is minted and separately comply with/cite OpenCRISPR-1 terms."
+title: "OpenCRISPR-1 gRNA Designer"
+type: software
+authors:
+  - family-names: "Behlim"
+    given-names: "Abdul Basit"
+version: 1.3.1
+date-released: 2026-09-09
+license: MIT
+repository-code: "https://github.com/abdulbasitbehlim/OpenCRISPR1-gRNA-Designer"
+keywords:
+  - CRISPR
+  - OpenCRISPR-1
+  - sgRNA
+# doi: add only after Zenodo mints it
