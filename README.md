@@ -74,6 +74,4 @@ The optional MIT/Hsu specificity calculation is retained as a transparent legacy
 
 The original software in this repository is MIT licensed. OpenCRISPR/OpenCRISPR-1 system/model terms are separate and are not relicensed by this repository. See `OPENCRISPR_TERMS_NOTICE.md`.
 
-## Deployment
 
-For deployment details, see `DEPLOYMENT_GUIDE.md` and `render.yaml`.
