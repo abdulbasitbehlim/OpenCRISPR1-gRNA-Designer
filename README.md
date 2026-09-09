@@ -1,6 +1,6 @@
 # OpenCRISPR-1 gRNA Designer v1.3.1
 
-GitHub-ready research software for designing and validating conservative NGG-compatible guide RNAs for OpenCRISPR-1. Full documentation, tests, CI, provenance, licensing notices and deployment instructions are included in this repository.
+Research software for designing and validating conservative NGG-compatible guide RNAs for OpenCRISPR-1, with tests, provenance, validation and reproducible scientific documentation.
 
 ## Live app and related projects
 
@@ -37,7 +37,6 @@ It does not claim that the heuristic score is an OpenCRISPR efficacy probability
 - custom existing-guide validation;
 - accession/version, assembly/release, retrieval time and SHA-256 provenance;
 - CSV, FASTA and JSON exports;
-- Streamlit UI, Docker and Render deployment configuration;
 - automated tests and GitHub Actions CI.
 
 ## Installation
@@ -73,5 +72,3 @@ The optional MIT/Hsu specificity calculation is retained as a transparent legacy
 ## Licensing note
 
 The original software in this repository is MIT licensed. OpenCRISPR/OpenCRISPR-1 system/model terms are separate and are not relicensed by this repository. See `OPENCRISPR_TERMS_NOTICE.md`.
-
-
