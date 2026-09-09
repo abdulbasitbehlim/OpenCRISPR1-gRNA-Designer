@@ -1,0 +1,2 @@
+tool,input,status,found_by_both,ours_only,external_only,reason
+CHOPCHOP,OpenCRISPR frozen target set,adapter protocol prepared/not executed,not claimed,not claimed,not claimed,external service/database backend not reproducibly executable in build environment
