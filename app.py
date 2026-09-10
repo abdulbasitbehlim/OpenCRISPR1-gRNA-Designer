@@ -12,6 +12,7 @@ from opencrispr_designer import (
     screen_local_reference, sequence_quality_score,
 )
 from sequence_sources import fetch_gene, manual_record, parse_multifasta
+from accession_sources import fetch_accession
 from validation import validate_opencrispr_guide, validation_summary_row
 
 APP_VERSION = "1.3.1"
@@ -47,8 +48,8 @@ st.sidebar.info("OpenCRISPR-1 compatibility is kept separate from the heuristic 
 
 st.markdown(f"""
 <div class="hero"><div class="eyebrow">OpenCRISPR-1</div><h1>Guide RNA <span style="color:{P['accent']}">Designer</span></h1>
-<p>Enter a gene and organism or provide reviewed FASTA. The tool retrieves/scans independent sequence segments, finds 20-nt spacers next to an NGG PAM on both strands, ranks sequence quality transparently, and reports 5'-G guide-expression formats that have been experimentally tested with OpenCRISPR-1.</p>
-<div class="pills"><span>OpenCRISPR-1</span><span>20 nt + NGG</span><span>Both strands</span><span>GX19 / gX19 / gX20</span><span>Guide validation</span><span>Legacy MIT/Hsu panel screen</span><span>CSV / FASTA / JSON</span></div></div>
+<p>Enter a gene and organism, provide a database accession ID, or paste reviewed FASTA. The tool retrieves/scans independent sequence segments, finds 20-nt spacers next to an NGG PAM on both strands, ranks sequence quality transparently, and reports 5'-G guide-expression formats that have been experimentally tested with OpenCRISPR-1.</p>
+<div class="pills"><span>OpenCRISPR-1</span><span>20 nt + NGG</span><span>Both strands</span><span>Accession ID</span><span>GX19 / gX19 / gX20</span><span>Guide validation</span><span>Legacy MIT/Hsu panel screen</span><span>CSV / FASTA / JSON</span></div></div>
 """, unsafe_allow_html=True)
 
 st.warning("Evidence status (2026): OpenCRISPR-1 has strong positive founding and follow-up reports, but independent evaluations have reported conflicting on-target/off-target performance. Treat compatibility as a design rule, not a guarantee of generalizable experimental performance; benchmark on your own loci and conditions.")
@@ -75,7 +76,7 @@ with st.expander("Quick validation of an existing OpenCRISPR guide"):
         except Exception as exc:
             st.error(str(exc))
 
-mode = st.radio("Input mode", ["Gene lookup", "Manual sequence / FASTA"], horizontal=True)
+mode = st.radio("Input mode", ["Gene lookup", "Accession ID", "Manual sequence / FASTA"], horizontal=True)
 submitted = False
 record = None
 
@@ -91,6 +92,24 @@ if mode == "Gene lookup":
             record = fetch_gene(gene.strip(), organism.strip(), source)
         except Exception as exc:
             st.error(f"Gene retrieval failed: {exc}")
+            st.stop()
+elif mode == "Accession ID":
+    with st.form("accession_form"):
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            accession = st.text_input(
+                "Gene accession ID",
+                placeholder="Example: NM_000546.6 or ENST00000269305",
+                help="NCBI nucleotide/RefSeq accession or Ensembl stable gene/transcript ID.",
+            )
+        with c2:
+            source = st.selectbox("Accession source", ["NCBI RefSeq / Nucleotide", "Ensembl REST"])
+        submitted = st.form_submit_button("Fetch accession and design OpenCRISPR guides", type="primary", use_container_width=True)
+    if submitted:
+        try:
+            record = fetch_accession(accession.strip(), source)
+        except Exception as exc:
+            st.error(f"Accession retrieval failed: {exc}")
             st.stop()
 else:
     with st.form("seq_form"):
