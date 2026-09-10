@@ -2,17 +2,13 @@
 
 Research software for designing and validating conservative NGG-compatible guide RNAs for OpenCRISPR-1, with tests, provenance, validation and reproducible scientific documentation.
 
-## Live app and related projects
+## Live app
 
 **Run the OpenCRISPR-1 app:** https://opencrispr1-grna-designer.onrender.com/
 
 **Give feedback:** https://github.com/abdulbasitbehlim/OpenCRISPR1-gRNA-Designer/issues/new?template=feedback.yml
 
 **GitHub repository:** https://github.com/abdulbasitbehlim/OpenCRISPR1-gRNA-Designer
-
-**Also available — Plant MultiGene gRNA Designer:**
-- Live app: https://plant-multigene-grna-designer.onrender.com/
-- GitHub: https://github.com/abdulbasitbehlim/Plant-MultiGene-gRNA-Designer
 
 > The Render free tier may sleep after inactivity, so the first load can take longer while the service wakes up.
 
@@ -30,7 +26,8 @@ It does not claim that the heuristic score is an OpenCRISPR efficacy probability
 
 ## Key features
 
-- gene lookup or reviewed manual FASTA input;
+- gene lookup, accession-ID retrieval, or reviewed manual FASTA input;
+- direct NCBI nucleotide/RefSeq and Ensembl stable-ID retrieval;
 - independent exon/segment scanning to avoid synthetic junction targets;
 - both-strand 20-nt + NGG discovery;
 - GX19, gX19 and gX20 guide-expression format reporting;
@@ -40,6 +37,17 @@ It does not claim that the heuristic score is an OpenCRISPR efficacy probability
 - accession/version, assembly/release, retrieval time and SHA-256 provenance;
 - CSV, FASTA and JSON exports;
 - automated tests and GitHub Actions CI.
+
+## Input modes
+
+### Gene lookup
+Enter a gene symbol/ID and organism, then retrieve the sequence from NCBI RefSeq or Ensembl REST.
+
+### Accession ID
+Enter a known NCBI nucleotide/RefSeq accession or an Ensembl stable gene/transcript ID. The retrieved source record and sequence provenance are retained for reproducibility.
+
+### Manual sequence / FASTA
+Paste a reviewed nucleotide sequence or FASTA record when you want to use a frozen or custom target sequence.
 
 ## Installation
 
@@ -61,7 +69,7 @@ Then open `http://localhost:8501`.
 
 ## Validation and testing
 
-The validated v1.3.1 package passed **34/34 tests** with approximately **88% branch-aware scientific-core coverage**. The test suite covers guide discovery, both strands, ambiguity handling, exon/segment boundaries, provenance, validation, guide-format variants and local specificity behavior.
+The test suite covers guide discovery, both strands, ambiguity handling, exon/segment boundaries, accession retrieval, provenance, validation, guide-format variants and local specificity behavior.
 
 A PASS means the candidate satisfies the rules implemented here. It does **not** mean experimentally proven editing success.
 
