@@ -7,6 +7,7 @@ from Bio.SeqFeature import SeqFeature, FeatureLocation
 from Bio.SeqRecord import SeqRecord
 
 import accession_sources as ac
+import sequence_sources as ss
 
 
 class FakeResponse:
@@ -66,6 +67,7 @@ def test_fetch_ensembl_transcript_accession(monkeypatch):
         raise AssertionError(url)
 
     monkeypatch.setattr(ac, "_get", fake_get)
+    monkeypatch.setattr(ss, "_get", fake_get)
     rec = ac.fetch_ensembl_accession("ENST00000001.4")
     assert rec.source == "Ensembl accession"
     assert rec.gene == "ENSG00000001"
