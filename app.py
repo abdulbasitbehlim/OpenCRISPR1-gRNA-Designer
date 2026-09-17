@@ -28,6 +28,9 @@ html,body,[data-testid="stAppViewContainer"],.stApp{{background:var(--app)!impor
 [data-testid="stHeader"]{{background:transparent!important}} .block-container{{max-width:1480px;padding-top:1.25rem;padding-bottom:4rem}}
 .stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp p,.stApp li,.stApp label{{color:var(--text)!important}}
 [data-testid="stCaptionContainer"] p{{color:var(--muted)!important}}
+[data-baseweb="input"] input,[data-baseweb="textarea"] textarea,.stApp input,.stApp textarea{{color:var(--text)!important;-webkit-text-fill-color:var(--text)!important}}
+[data-baseweb="select"] span,[data-baseweb="select"] div,[data-baseweb="select"] svg{{color:var(--text)!important;fill:var(--text)!important}}
+.stApp input::placeholder,.stApp textarea::placeholder{{color:var(--muted)!important;opacity:.85!important}}
 .hero{{padding:2.1rem 2.3rem;border:1px solid var(--border);border-radius:22px;background:linear-gradient(135deg,var(--panel),var(--panel2));margin-bottom:1.2rem}}
 .hero .eyebrow{{font-size:.75rem;letter-spacing:.15em;text-transform:uppercase;color:var(--accent)!important;font-weight:800}} .hero h1{{font-size:clamp(2rem,4.5vw,4rem);margin:.6rem 0 .8rem;letter-spacing:-.04em;line-height:1}} .hero p{{color:var(--muted)!important;max-width:950px;line-height:1.65}}
 .pills{{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem}} .pills span{{border:1px solid var(--border);background:var(--panel2);border-radius:999px;padding:.35rem .65rem;font-size:.78rem}}
