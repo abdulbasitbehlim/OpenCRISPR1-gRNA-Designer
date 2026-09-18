@@ -9,13 +9,14 @@ import streamlit as st
 
 from opencrispr_designer import (
     GuideRNA, design_from_segments, gc_percent, guide_row, guide_format_variants,
-    screen_local_reference, sequence_quality_score,
+    sequence_quality_score,
 )
 from sequence_sources import fetch_gene, manual_record, parse_multifasta
 from accession_sources import fetch_accession
 from validation import validate_opencrispr_guide, validation_summary_row
 
-APP_VERSION = "1.3.1"
+from local_screening import TargetLocus, screen_reference
+from workflow import APP_VERSION, clear_design_state, guide_key, reset_panel_if_changed, export_bundle
 st.set_page_config(page_title="OpenCRISPR-1 gRNA Designer", page_icon="🧬", layout="wide")
 
 dark = st.sidebar.toggle("Dark mode", value=True)
@@ -63,7 +64,7 @@ with st.expander("Quick validation of an existing OpenCRISPR guide"):
     with qc1:
         quick_spacer = st.text_input("Existing spacer (20 nt)", key="oc_quick_spacer", max_chars=20).strip().upper()
     with qc2:
-        quick_pam = st.text_input("PAM", value="AGG", key="oc_quick_pam", max_chars=3).strip().upper()
+        quick_pam = st.text_input("PAM", value="", key="oc_quick_pam", max_chars=3).strip().upper()
     if st.button("Validate existing guide", key="oc_quick_validate"):
         try:
             if len(quick_spacer) != 20:
@@ -79,7 +80,13 @@ with st.expander("Quick validation of an existing OpenCRISPR guide"):
         except Exception as exc:
             st.error(str(exc))
 
-mode = st.radio("Input mode", ["Gene lookup", "Accession ID", "Manual sequence / FASTA"], horizontal=True)
+def load_offline_example():
+    clear_design_state(st.session_state)
+    st.session_state["oc_input_mode"] = "Manual sequence / FASTA"
+    st.session_state["oc_target_raw"] = ">demo_forward\nACGTACGTACGTACGTACGTAGG\n>demo_reverse\nCCATCAGTCAGTCAGTCAGTCAG"
+
+st.button("Load offline example", on_click=load_offline_example)
+mode = st.radio("Input mode", ["Gene lookup", "Accession ID", "Manual sequence / FASTA"], horizontal=True, key="oc_input_mode")
 submitted = False
 record = None
 
@@ -88,9 +95,10 @@ if mode == "Gene lookup":
         c1, c2, c3 = st.columns([1, 1.4, 1])
         with c1: gene = st.text_input("Gene symbol / ID", value="TP53")
         with c2: organism = st.text_input("Organism", value="Homo sapiens")
-        with c3: source = st.selectbox("Sequence source", ["NCBI RefSeq", "Ensembl REST"])
+        with c3: source = st.selectbox("Sequence source", ["Ensembl REST", "NCBI RefSeq"])
         submitted = st.form_submit_button("Design OpenCRISPR guides", type="primary", use_container_width=True)
     if submitted:
+        clear_design_state(st.session_state)
         try:
             record = fetch_gene(gene.strip(), organism.strip(), source)
         except Exception as exc:
@@ -102,13 +110,14 @@ elif mode == "Accession ID":
         with c1:
             accession = st.text_input(
                 "Gene accession ID",
-                placeholder="Example: NM_000546.6 or ENST00000269305",
-                help="NCBI nucleotide/RefSeq accession or Ensembl stable gene/transcript ID.",
+                placeholder="Example: ENST00000269305 (Ensembl source)",
+                help="Choose the matching source. NCBI RNA records require exon annotations; transcripts without boundaries are rejected. Ensembl transcript IDs provide independent exons.",
             )
         with c2:
             source = st.selectbox("Accession source", ["NCBI RefSeq / Nucleotide", "Ensembl REST"])
         submitted = st.form_submit_button("Fetch accession and design OpenCRISPR guides", type="primary", use_container_width=True)
     if submitted:
+        clear_design_state(st.session_state)
         try:
             record = fetch_accession(accession.strip(), source)
         except Exception as exc:
@@ -119,179 +128,125 @@ else:
         c1, c2 = st.columns(2)
         with c1: gene = st.text_input("Target label", value="target_gene")
         with c2: organism = st.text_input("Organism / sample label", value="manual")
-        raw = st.text_area("DNA / RNA / FASTA", height=240, placeholder=">exon1\nACGT...\n>exon2\nACGT...")
+        raw = st.text_area("DNA / RNA / FASTA", key="oc_target_raw", height=240, placeholder=">exon1\nACGT...\n>exon2\nACGT...")
         submitted = st.form_submit_button("Design OpenCRISPR guides", type="primary", use_container_width=True)
     if submitted:
+        clear_design_state(st.session_state)
         try:
             record = manual_record(raw, gene=gene.strip() or "target_gene", organism=organism)
         except Exception as exc:
             st.error(str(exc)); st.stop()
 
 if submitted and record:
-    guides = design_from_segments(record.gene, record.segments, max_guides=max_guides, min_score=min_score)
+    try:
+        guides = design_from_segments(record.gene, record.segments, max_guides=max_guides, min_score=min_score)
+    except ValueError as exc:
+        st.error(str(exc))
+        st.stop()
     st.session_state["oc_record"] = record
     st.session_state["oc_guides"] = guides
+    st.session_state["oc_settings"] = {"max_guides": max_guides, "min_score": min_score, "min_spec_review": min_spec_review}
+    st.session_state["oc_screens"] = {}
 
 if "oc_guides" in st.session_state:
     record = st.session_state["oc_record"]
     guides = st.session_state["oc_guides"]
+    settings = st.session_state["oc_settings"]
+    if settings != {"max_guides": max_guides, "min_score": min_score, "min_spec_review": min_spec_review}:
+        st.warning("Design settings changed. Submit the input again to update the results and exports.")
+        st.stop()
     st.subheader("Design summary")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Gene", record.gene)
-    m2.metric("Scanned segments", len(record.segments))
-    m3.metric("Scanned bp", f"{record.total_bp:,}")
-    m4.metric("Returned guides", len(guides))
+    cols = st.columns(4)
+    for col, label, value in zip(cols, ["Gene", "Scanned segments", "Scanned bp", "Returned guides"],
+                                  [record.gene, len(record.segments), f"{record.total_bp:,}", len(guides)]):
+        col.metric(label, value)
     st.caption(f"Source: {record.source} · {record.accession} · {record.description}")
+    st.caption("Coordinates are 1-based and inclusive within each supplied segment. They are not chromosome coordinates.")
     with st.expander("Sequence provenance and reproducibility"):
-        st.code(
-            f"record/version: {record.source_record_version}\n"
-            f"assembly/genomic record: {record.assembly}\n"
-            f"annotation release: {record.annotation_release}\n"
-            f"retrieved UTC: {record.retrieved_at_utc}\n"
-            f"sequence SHA-256: {record.sequence_sha256}\n"
-            f"ambiguous bases: {record.ambiguity_count} ({', '.join(record.ambiguity_codes) or 'none'})",
-            language=None,
-        )
-    for w in record.warnings: st.warning(w)
-
+        st.caption(f"sequence SHA-256: {record.sequence_sha256}")
+        st.json(record.provenance_dict())
+    for warning in record.warnings:
+        st.warning(warning)
     if not guides:
         st.warning("No NGG-compatible 20-nt guide met the selected quality threshold.")
         st.stop()
 
-    validation_reports = []
-    for candidate in guides:
-        local_state = st.session_state.get(f"oc_local::{candidate.spacer}")
-        if local_state is None:
-            report = validate_opencrispr_guide(candidate, min_sequence_score=min_score, min_specificity_review=min_spec_review)
-        else:
-            spec, hits = local_state
-            report = validate_opencrispr_guide(
-                candidate, min_sequence_score=min_score, local_hits=hits,
-                specificity_score=spec, min_specificity_review=min_spec_review,
-            )
-        validation_reports.append(report)
-    df = pd.DataFrame([
-        {**guide_row(candidate), **validation_summary_row(report)}
-        for candidate, report in zip(guides, validation_reports)
-    ])
-    st.markdown("#### Ranked guides with validation")
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        fig = px.scatter(df, x="GC%", y="Sequence quality", hover_name="Spacer (20 nt)", symbol="Strand", title="Candidate guide landscape")
-        fig.update_layout(template=P["plot"], height=390, margin=dict(l=20,r=20,t=50,b=20)); st.plotly_chart(fig, use_container_width=True)
-    with c2:
-        top = df.head(20)
-        fig2 = px.bar(top, x="Spacer (20 nt)", y="Sequence quality", pattern_shape="Strand", title="Top OpenCRISPR-compatible spacers")
-        fig2.update_layout(template=P["plot"], height=390, margin=dict(l=20,r=20,t=50,b=20), xaxis_tickangle=-45); st.plotly_chart(fig2, use_container_width=True)
-
-    labels = [f"{i+1}. {g.spacer} · {g.pam} · {g.strand} · score {g.sequence_score:.0f}" for i,g in enumerate(guides)]
-    selected_label = st.selectbox("Inspect one guide", labels)
-    g = guides[labels.index(selected_label)]
-    st.markdown(f"### `{g.spacer}` + `{g.pam}`")
-    d1,d2,d3,d4 = st.columns(4)
-    d1.metric("OpenCRISPR-1", "Compatible")
-    d2.metric("GC", f"{g.gc_percent:.1f}%")
-    d3.metric("Sequence quality", f"{g.sequence_score:.1f}")
-    d4.metric("Target strand", g.strand)
-
-    selected_local = st.session_state.get(f"oc_local::{g.spacer}")
-    if selected_local is None:
-        selected_validation = validate_opencrispr_guide(g, min_sequence_score=min_score, min_specificity_review=min_spec_review)
-    else:
-        selected_spec, selected_hits = selected_local
-        selected_validation = validate_opencrispr_guide(
-            g, min_sequence_score=min_score, local_hits=selected_hits, specificity_score=selected_spec,
-            min_specificity_review=min_spec_review,
-        )
-    st.markdown("#### Validation")
-    v1,v2,v3,v4 = st.columns(4)
-    v1.metric("Overall", selected_validation.status)
-    v2.metric("PASS checks", selected_validation.pass_count)
-    v3.metric("REVIEW checks", selected_validation.review_count)
-    v4.metric("FAIL checks", selected_validation.fail_count)
-    st.dataframe(pd.DataFrame([c.__dict__ for c in selected_validation.checks]), use_container_width=True, hide_index=True)
-    if selected_validation.status == "PASS":
-        st.success("Core OpenCRISPR-1 validation passed. Specificity status: " + selected_validation.specificity_status)
-    elif selected_validation.status == "REVIEW":
-        st.warning("No hard compatibility failure, but one or more checks need review. Specificity status: " + selected_validation.specificity_status)
-    else:
-        st.error("One or more hard validation checks failed. Resolve them before prioritizing this guide.")
-
-    st.markdown("#### Guide-expression formats reported with OpenCRISPR-1")
-    fmt_df = pd.DataFrame([x.__dict__ for x in guide_format_variants(g.spacer)])
-    st.dataframe(fmt_df, use_container_width=True, hide_index=True)
-    st.caption("These labels describe 5'-G guide formats evaluated in the 2026 OpenCRISPR study; they are not a claim that one format is universally optimal.")
-
+    selected = st.selectbox("Inspect one guide", range(len(guides)),
+                            format_func=lambda i: f"{i+1}. {guides[i].spacer} · {guides[i].segment_id}:{guides[i].start} ({guides[i].strand})")
+    g = guides[selected]
     with st.expander("Optional local-reference specificity screen"):
-        st.caption("Upload/paste an intended locus plus nearby or suspected off-target sequences. MIT/Hsu (2013) is retained only as a transparent legacy baseline; later empirical scores such as CFD and newer ML models can outperform it. This is not a whole-genome specificity result.")
+        st.caption("Supply up to 2 million bases. The screen searches the unmodified 20-base targeting spacer on both strands at NGG sites, allowing 0–4 substitutions. It does not screen a complete sgRNA or model the effects of an added or substituted 5′ G.")
         ref = st.text_area("Reference FASTA", height=170, key="oc_ref")
         radius = st.slider("Maximum mismatches", 0, 4, 3, key="oc_mm")
+        display_limit = st.number_input("Maximum displayed hits", min_value=1, max_value=5000, value=250)
+        exclude = st.checkbox("Exclude a verified intended locus", value=False,
+                              help="Only this exact contig, start and strand will be excluded, after the spacer and PAM are checked.")
+        intended = None
+        if exclude:
+            c1, c2, c3 = st.columns(3)
+            contig = c1.text_input("Intended reference FASTA ID")
+            start = c2.number_input("Intended spacer start", min_value=1, value=1)
+            strand = c3.selectbox("Intended spacer strand", ["+", "-"])
+            intended = TargetLocus(contig.strip(), int(start), strand)
+        reset_panel_if_changed(st.session_state, ref, radius, intended, int(display_limit))
         if st.button("Run local specificity", key="oc_screen"):
+            key = guide_key(record, g)
+            st.session_state["oc_screens"].pop(key, None)
             try:
-                panel = parse_multifasta(ref)
-                spec, hits = screen_local_reference(g.spacer, panel, radius)
-                g.specificity_score = spec; g.specificity_method = "MIT/Hsu 2013 legacy baseline (supplied FASTA panel)"; g.off_target_count = len(hits)
-                st.session_state[f"oc_local::{g.spacer}"] = (spec, hits)
-                st.metric("MIT/Hsu legacy specificity (supplied panel)", spec)
-                st.info("Interpret this as a legacy baseline only. For experimental prioritization, use a genome-aware workflow and, where applicable, more modern off-target scoring/validation such as CFD-informed or validated ML/empirical methods.")
-                screened_validation = validate_opencrispr_guide(
-                    g, min_sequence_score=min_score, local_hits=hits, specificity_score=spec,
-                    min_specificity_review=min_spec_review,
-                )
-                if screened_validation.specificity_status.startswith("FAIL"):
-                    st.error("Local validation: " + screened_validation.specificity_status)
-                elif screened_validation.specificity_status.startswith("REVIEW"):
-                    st.warning("Local validation: " + screened_validation.specificity_status)
-                else:
-                    st.success("Local validation: " + screened_validation.specificity_status)
-                hit_df = pd.DataFrame([{**h.__dict__, "mismatch_positions": ",".join(map(str,h.mismatch_positions)) or "Exact", "mit_pair_risk": round(h.mit_pair_risk*100,2)} for h in hits])
-                if hit_df.empty: st.success("No retained near matches after excluding one exact intended target.")
-                else: st.dataframe(hit_df, use_container_width=True, hide_index=True)
-            except Exception as exc:
+                result = screen_reference(g.spacer, parse_multifasta(ref), radius, intended, int(display_limit))
+                st.session_state["oc_screens"][key] = result
+            except ValueError as exc:
                 st.error(str(exc))
+        result = st.session_state["oc_screens"].get(guide_key(record, g))
+        if result:
+            st.metric("MIT/Hsu legacy specificity (supplied panel)", result.specificity_score if result.specificity_score is not None else "Not available")
+            st.caption(f"{result.total_hits} total hits · {len(result.hits)} displayed · {result.scanned_sites} searchable NGG sites · reference SHA-256 {result.panel_sha256}")
+            for warning in result.warnings:
+                st.warning(warning)
+            if result.hits:
+                st.dataframe(pd.DataFrame([h.__dict__ for h in result.hits]), use_container_width=True, hide_index=True)
+            else:
+                st.info("No matching hits were retained within this panel and mismatch radius. Review the search scope and intended-locus status.")
+
+    screens = st.session_state["oc_screens"]
+    rows, bundle = export_bundle(record, guides, screens, settings)
+    df = pd.DataFrame(rows)
+    st.markdown("#### Ranked guides with validation")
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    fig = px.scatter(df, x="GC%", y="Sequence quality", hover_name="Spacer (20 nt)", symbol="Strand")
+    fig.update_layout(template=P["plot"], height=340, margin=dict(l=20, r=20, t=20, b=20))
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown(f"### `{g.spacer}` + `{g.pam}`")
+    selected_validation = validate_opencrispr_guide(g, min_sequence_score=min_score,
+                                                   min_specificity_review=min_spec_review,
+                                                   panel_screen=screens.get(guide_key(record, g)))
+    st.metric("Sequence and panel rule result", selected_validation.status)
+    st.caption("Specificity status: " + selected_validation.specificity_status + ". PASS means the implemented checks passed; it does not mean proven editing or genome-wide specificity.")
+    st.dataframe(pd.DataFrame([c.__dict__ for c in selected_validation.checks]), use_container_width=True, hide_index=True)
+    st.markdown("#### Guide-expression formats reported with OpenCRISPR-1")
+    st.dataframe(pd.DataFrame([x.__dict__ for x in guide_format_variants(g.spacer)]), use_container_width=True, hide_index=True)
+    st.caption("GX19 has a natural first G; gX19 replaces base 1; gX20 adds a G before the intact spacer. X20 is the unmodified spacer. These are spacer formats, not full sgRNA constructs; provide an appropriate scaffold separately. Format order is not an efficacy ranking.")
 
     st.subheader("Exports")
-    export_reports = []
-    for candidate in guides:
-        export_state = st.session_state.get(f"oc_local::{candidate.spacer}")
-        if export_state is None:
-            export_report = validate_opencrispr_guide(candidate, min_sequence_score=min_score, min_specificity_review=min_spec_review)
-        else:
-            export_spec, export_hits = export_state
-            export_report = validate_opencrispr_guide(
-                candidate, min_sequence_score=min_score, local_hits=export_hits,
-                specificity_score=export_spec, min_specificity_review=min_spec_review,
-            )
-        export_reports.append(export_report)
-    out_df = pd.DataFrame([
-        {**guide_row(candidate), **validation_summary_row(report)}
-        for candidate, report in zip(guides, export_reports)
-    ])
+    out_df = df.copy()
+    out_df["App version"] = APP_VERSION
     out_df["Input source record/version"] = record.source_record_version
     out_df["Input assembly/genomic record"] = record.assembly
-    out_df["Input annotation release"] = record.annotation_release
-    out_df["Input retrieved UTC"] = record.retrieved_at_utc
     out_df["Input sequence SHA-256"] = record.sequence_sha256
-    out_df["Evidence status"] = "2025–2026 independent evaluations are mixed; compatibility is not an efficacy guarantee."
-    out_df["Specificity method note"] = "MIT/Hsu 2013 is a legacy supplied-panel baseline, not state-of-the-art or genome-wide specificity."
-    csv = out_df.to_csv(index=False).encode()
-    fasta = "\n".join(f">opencrispr_guide_{i+1}|pam={x.pam}|strand={x.strand}|score={x.sequence_score}\n{x.spacer}" for i,x in enumerate(guides)).encode()
-    js = json.dumps({
-        "app":"OpenCRISPR-1 gRNA Designer",
-        "version":APP_VERSION,
-        "target": record.provenance_dict(),
-        "evidence_status": "OpenCRISPR-1 performance remains context-dependent; 2026 literature includes conflicting independent evaluations. Compatibility is not an efficacy guarantee.",
-        "specificity_method_note": "MIT/Hsu 2013 is a legacy supplied-panel baseline, not state-of-the-art or genome-wide specificity.",
-        "guides":[
-            {**guide_row(candidate), **validation_summary_row(report), "validation_checks":[c.__dict__ for c in report.checks]}
-            for candidate, report in zip(guides, export_reports)
-        ],
-    }, indent=2).encode()
-    b1,b2,b3 = st.columns(3)
-    b1.download_button("Download CSV", csv, "opencrispr_guides.csv", "text/csv", use_container_width=True)
-    b2.download_button("Download FASTA", fasta, "opencrispr_guides.fasta", "text/plain", use_container_width=True)
-    b3.download_button("Download JSON", js, "opencrispr_guides.json", "application/json", use_container_width=True)
+    out_df["Design settings"] = json.dumps(settings, sort_keys=True)
+    fasta = "\n".join(f">guide_{i+1}|segment={x.segment_id}|start={x.start}|end={x.end}|strand={x.strand}|pam={x.pam}\n{x.spacer}" for i, x in enumerate(guides))
+    b1, b2, b3 = st.columns(3)
+    b1.download_button("Download CSV", out_df.to_csv(index=False).encode(), "opencrispr_guides.csv", "text/csv", use_container_width=True)
+    b2.download_button("Download FASTA", fasta.encode(), "opencrispr_guides.fasta", "text/plain", use_container_width=True)
+    b3.download_button("Download JSON", json.dumps(bundle, indent=2).encode(), "opencrispr_guides.json", "application/json", use_container_width=True)
+    st.caption("JSON includes validation checks, expression formats, reference fingerprint, screening settings, total counts and retained hit details. Keep the original reference FASTA alongside the export.")
 
-    st.markdown("---")
-    st.markdown("**Scientific boundary:** candidate ranking does not replace genomic/exon validation, variant review, or genome-wide off-target analysis. OpenCRISPR-1 guide compatibility is based on published NGG/guide-architecture evidence, but 2026 studies report conflicting performance across experimental settings. The local MIT/Hsu score is a legacy supplied-panel baseline, not state-of-the-art specificity prediction.")
+with st.expander("Scientific sources and remaining limits"):
+    st.markdown("""
+- [Ruffolo et al. 2025 — founding OpenCRISPR study](https://www.nature.com/articles/s41586-025-09298-z)
+- [Hwang et al. 2026 — independent evaluation and guide formats](https://link.springer.com/article/10.1186/s13073-026-01682-2)
+- [Tian et al. 2025 — comparative evaluation](https://doi.org/10.1126/sciadv.adu7334)
+
+The heuristic is not a learned OpenCRISPR activity model. The local screen does not cover a whole genome, RNA/DNA bulges, non-NGG PAMs, chromatin or sample variants. Genomic mapping, scaffold selection, delivery, and experimental confirmation remain separate tasks. Base editing and prime editing are not designed by this app.
+""")

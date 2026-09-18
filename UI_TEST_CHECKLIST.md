@@ -41,3 +41,7 @@ For OpenCRISPR-1, also verify:
 - no UI text calls MIT/Hsu state-of-the-art or calls compatibility an efficacy guarantee.
 
 Record browser, OS, Streamlit version, test date, and any screenshots/issues in your project review notes.
+
+## Automated workflow verification in v1.4.0
+
+Three Streamlit AppTest tests now exercise offline demo loading, design submission, coordinate-aware screening, stale-state invalidation and failed-input clearing. These pass on Python 3.12; manual browser appearance and deployment checks remain separate.

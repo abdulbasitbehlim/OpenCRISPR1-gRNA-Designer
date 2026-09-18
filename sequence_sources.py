@@ -116,12 +116,90 @@ def parse_multifasta(raw: str) -> Dict[str, str]:
         return {}
     if not any(ln.lstrip().startswith(">") for ln in raw.splitlines()):
         return {"sequence_1": clean_dna(raw)}
+    if not raw.lstrip().startswith(">"):
+        raise ValueError("FASTA sequence data must follow a header; remove text before the first >.")
     out = {}
-    for i, rec in enumerate(SeqIO.parse(StringIO(raw), "fasta"), start=1):
-        out[rec.id or f"sequence_{i}"] = clean_dna(str(rec.seq))
+    name = None
+    chunks = []
+    def save_record():
+        if name is None:
+            return
+        seq = clean_dna("\n".join(chunks))
+        if not seq:
+            raise ValueError(f"FASTA record {name!r} is empty.")
+        out[name] = seq
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith(">"):
+            save_record()
+            header = line[1:].strip()
+            if not header:
+                raise ValueError("Every FASTA record needs a non-empty identifier.")
+            name = header.split()[0]
+            if name in out:
+                raise ValueError(f"Duplicate FASTA identifier {name!r}; give every record a unique name.")
+            chunks = []
+        else:
+            chunks.append(line)
+    save_record()
     if not out:
         raise ValueError("No readable FASTA records were found.")
     return out
+
+
+def segments_from_ncbi_record(rec) -> Tuple[List[Tuple[str, str]], List[str]]:
+    """Extract independent annotated intervals, never reconstruct spliced DNA.
+
+    Coordinates remain relative to the supplied record, in its stored orientation.
+    A transcript without exon boundaries cannot establish genomic adjacency.
+    """
+    seq = clean_dna(str(rec.seq))
+    if len(seq) > 500_000:
+        raise ValueError("Use a gene-specific accession or a target region of at most 500,000 bases.")
+    cds = [f for f in rec.features if f.type == "CDS"]
+    exons = [f for f in rec.features if f.type == "exon"]
+    if len(cds) > 1:
+        raise ValueError("Multiple CDS annotations were found; provide a single-gene accession or explicitly selected genomic FASTA region.")
+    is_rna = ("RNA" in str(rec.annotations.get("molecule_type", "")).upper()
+              or rec.id.upper().startswith(("NM_", "XM_", "NR_", "XR_")))
+    if is_rna and not exons:
+        raise ValueError("Transcript exon boundaries are unavailable; use annotated exons or a reviewed genomic FASTA region. Spliced transcript fallback is disabled.")
+    features = exons or cds
+    warnings = ["Coordinates refer to independent source-record intervals, not chromosome positions. Verify assembly and coding context."]
+    if not cds:
+        warnings.append("No CDS feature was present; coding-region status is unverified.")
+    if not features:
+        if not seq:
+            raise ValueError("The accession contains no usable sequence.")
+        return [("accession_sequence", seq)], warnings
+    intervals = set()
+    for feature in features:
+        if feature.location is None:
+            raise ValueError("An annotation is missing sequence coordinates.")
+        for part in feature.location.parts:
+            if part.ref is not None or part.ref_db is not None:
+                raise ValueError("Remote feature locations require an explicitly resolved target sequence.")
+            a, b = int(part.start), int(part.end)
+            # Intersect each exon with each CDS part, not the CDS bounding span.
+            if exons and cds:
+                if cds[0].location is None:
+                    raise ValueError("The CDS annotation is missing sequence coordinates.")
+                for c in cds[0].location.parts:
+                    if c.ref is not None or c.ref_db is not None:
+                        raise ValueError("Remote CDS locations require an explicitly resolved target sequence.")
+                    x, y = max(a, int(c.start)), min(b, int(c.end))
+                    if y > x:
+                        intervals.add((x, y))
+            else:
+                intervals.add((a, b))
+    prefix = "coding_exon" if cds and exons else "exon" if exons else "CDS_part"
+    segments = [(f"{prefix}_{i}:{a+1}-{b}", seq[a:b])
+                for i, (a, b) in enumerate(sorted(intervals), 1) if b - a >= 23]
+    if not segments:
+        raise ValueError("No independent annotated interval is at least 23 bases; short exons are not joined for DNA targeting.")
+    return segments, warnings
 
 
 def manual_record(raw: str, gene: str = "manual_target", organism: str = "manual") -> GeneSequenceRecord:
@@ -161,6 +239,8 @@ def fetch_ncbi_gene(gene: str, organism: str) -> GeneSequenceRecord:
     ids = s.json().get("esearchresult", {}).get("idlist", [])
     if not ids:
         raise ValueError(f"NCBI Gene could not resolve '{gene}' in '{organism}'.")
+    if len(ids) > 1:
+        raise ValueError("Gene lookup is ambiguous; use a specific accession ID.")
     l = _get(f"{NCBI_EUTILS}/elink.fcgi", params={**common, "dbfrom": "gene", "db": "nuccore", "id": ids[0], "linkname": "gene_nuccore_refseqrna", "retmode": "json"})
     dbs = l.json().get("linksets", [{}])[0].get("linksetdbs", [])
     nids = dbs[0].get("links", []) if dbs else []
@@ -177,25 +257,8 @@ def fetch_ncbi_gene(gene: str, organism: str) -> GeneSequenceRecord:
         return (0 if has_cds else 1, prefix, -len(rec.seq))
 
     rec = sorted(records, key=rank)[0]
-    seq = clean_dna(str(rec.seq))
-    cds_features = [x for x in rec.features if x.type == "CDS"]
-    exon_features = [x for x in rec.features if x.type == "exon"]
-    warnings: List[str] = []
-    segments: List[Tuple[str, str]] = []
-    if cds_features:
-        cds = cds_features[0]
-        c0, c1 = int(cds.location.start), int(cds.location.end)
-        for idx, exon in enumerate(exon_features, start=1):
-            e0, e1 = int(exon.location.start), int(exon.location.end)
-            a, b = max(c0, e0), min(c1, e1)
-            if b > a and b - a >= 23:
-                segments.append((f"coding_exon_{idx}:{a+1}-{b}", seq[a:b]))
-        if not segments:
-            segments = [(f"spliced_CDS:{c0+1}-{c1}", seq[c0:c1])]
-            warnings.append("Exon boundaries were unavailable in the chosen RefSeq RNA; review genomic mapping to exclude exon-junction candidates.")
-    else:
-        segments = [("transcript", seq)]
-        warnings.append("No CDS feature was present; candidates are scanned from the transcript and require coding/genomic context review.")
+    segments, warnings = segments_from_ncbi_record(rec)
+    warnings.append("Gene lookup selects one transcript using a heuristic; use Accession ID to control the isoform.")
     amb_count, amb_codes = _ambiguity_fields(str(rec.seq))
     _append_ambiguity_warning(warnings, amb_count, amb_codes)
     genomic_record = _ncbi_genomic_record(ids[0], common)

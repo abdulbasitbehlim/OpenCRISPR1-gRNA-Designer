@@ -1,84 +1,75 @@
-# OpenCRISPR-1 gRNA Designer v1.3.1
+# OpenCRISPR-1 gRNA Designer v1.4.0
 
-Research software for designing and validating conservative NGG-compatible guide RNAs for OpenCRISPR-1, with tests, provenance, validation and reproducible scientific documentation.
+A Python/Streamlit workbench for discovering conservative 20-nt + NGG targeting spacers, reviewing sequence quality, and checking near matches in a supplied FASTA panel. Scores are **not OpenCRISPR-specific editing probabilities**.
 
-## Live app
+## Run locally
 
-**Run the OpenCRISPR-1 app:** https://opencrispr1-grna-designer.onrender.com/
-
-**Give feedback:** https://github.com/abdulbasitbehlim/OpenCRISPR1-gRNA-Designer/issues/new?template=feedback.yml
-
-**GitHub repository:** https://github.com/abdulbasitbehlim/OpenCRISPR1-gRNA-Designer
-
-> The Render free tier may sleep after inactivity, so the first load can take longer while the service wakes up.
-
-## Scope
-
-This tool is a conservative OpenCRISPR-1 design workbench. It scans independent sequence segments on both strands for 20-nt spacers adjacent to an NGG PAM, ranks transparent sequence-quality features, validates each candidate, and reports guide-expression formats used in OpenCRISPR-1 studies.
-
-The software deliberately separates:
-
-- **OpenCRISPR compatibility** — 20-nt spacer + NGG design rule;
-- **sequence quality** — GC, poly-T, homopolymers and transparent heuristic ranking;
-- **specificity** — optional supplied-FASTA near-match screening using a legacy MIT/Hsu baseline.
-
-It does not claim that the heuristic score is an OpenCRISPR efficacy probability, and it does not replace genome-wide off-target assessment or experimental validation.
-
-## Key features
-
-- gene lookup, accession-ID retrieval, or reviewed manual FASTA input;
-- direct NCBI nucleotide/RefSeq and Ensembl stable-ID retrieval;
-- independent exon/segment scanning to avoid synthetic junction targets;
-- both-strand 20-nt + NGG discovery;
-- GX19, gX19 and gX20 guide-expression format reporting;
-- PASS / REVIEW / FAIL validation;
-- optional local FASTA near-match specificity screen;
-- custom existing-guide validation;
-- accession/version, assembly/release, retrieval time and SHA-256 provenance;
-- CSV, FASTA and JSON exports;
-- automated tests and GitHub Actions CI.
-
-## Input modes
-
-### Gene lookup
-Enter a gene symbol/ID and organism, then retrieve the sequence from NCBI RefSeq or Ensembl REST.
-
-### Accession ID
-Enter a known NCBI nucleotide/RefSeq accession or an Ensembl stable gene/transcript ID. The retrieved source record and sequence provenance are retained for reproducibility.
-
-### Manual sequence / FASTA
-Paste a reviewed nucleotide sequence or FASTA record when you want to use a frozen or custom target sequence.
-
-## Installation
+Python 3.11 or newer:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-streamlit run app.py
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+# macOS / Linux instead: source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
 ```
 
-Or with Docker:
+Open `http://localhost:8501`. Click **Load offline example**, then **Design OpenCRISPR guides**, to try both strands without database access. The bundled sequences are synthetic software examples, not experimentally validated guides.
+
+Docker is also supported with `docker compose up --build`.
+
+The existing hosted endpoint is https://opencrispr1-grna-designer.onrender.com/ . A source update on a development branch does not establish that this hosted instance is running v1.4.0.
+
+## What changed
+
+- An exact match is excluded only at a user-specified, sequence-verified contig/start/strand. No first match is automatically assumed to be the intended locus.
+- Scores and total counts include **all matching sites within the mismatch radius**, even if the hit display is capped.
+- Duplicate or empty FASTA records are rejected instead of silently losing data.
+- NCBI RNA records without exon boundaries, records with multiple CDS annotations, and short-exon fallback joins are blocked. Compound CDS parts are handled independently.
+- Requested accession versions are checked; Ensembl version suffixes are not silently ignored.
+- Changing target, panel, mismatch radius or exclusion settings invalidates incompatible stored results. New failed designs clear old results.
+- JSON exports include reference hashes, search parameters, total mismatch counts, hit truncation, verified intended coordinates, expression formats and validation checks.
+- Bounded panel scanning, explicit input limits, a native X20 format option, source links and executable examples improve practical use.
+
+## Scope and limits
+
+The app finds 20-base spacers next to NGG on either strand. Gene lookup selects one transcript; use a specific accession to control the isoform. Manual FASTA records are independent sequence segments. Coordinates are 1-based inclusive and relative to each input segment, not chromosome positions.
+
+The optional local screen supports up to 2,000,000 supplied bases, 0–4 substitutions, and NGG PAMs. It does not cover bulges, alternate PAMs, chromatin, sample variants or an entire human genome. The legacy MIT/Hsu score is a panel summary, not a calibrated OpenCRISPR-1 risk estimate. **PASS means implemented rules passed, not experimentally established editing success.**
+
+No full sgRNA scaffold generator, base-editing designer, prime-editing designer, learned efficacy model or whole-genome search is included. Retain the original reference FASTA with exported JSON.
+
+## Verification
 
 ```bash
-docker compose up --build
+python -m pip install -r requirements-dev.txt
+python -m pytest -q --cov=. --cov-config=.coveragerc --cov-fail-under=80
+python benchmarks/run_audit_examples.py
 ```
 
-Then open `http://localhost:8501`.
+Audit on Python 3.12: **79 tests passed**, **90.98% branch-aware core coverage**, and **14/14 deterministic examples passed**. Coverage excludes `app.py`; three Streamlit AppTest tests exercise its actual reruns separately. Database retrieval unit tests use mocked responses. Live Ensembl attempts for HBB, TP53 and VEGFA failed in the audit environment (timeouts/server error); successful live retrieval is not claimed.
 
-## Validation and testing
+## Documentation
 
-The test suite covers guide discovery, both strands, ambiguity handling, exon/segment boundaries, accession retrieval, provenance, validation, guide-format variants and local specificity behavior.
+- [Updated software guide and audit](docs/UPDATED_SOFTWARE_GUIDE.md)
+- [Download the updated Word guide](docs/OpenCRISPR1_Updated_Software_Guide.docx)
+- [User guide](USER_GUIDE.md)
+- [Architecture and API migration](ARCHITECTURE.md)
+- [Change log](CHANGELOG.md)
+- [Executable example results](benchmarks/results/audit_examples.json)
 
-A PASS means the candidate satisfies the rules implemented here. It does **not** mean experimentally proven editing success.
+## Scientific sources
 
-## Evidence boundary
+- [Ruffolo et al., Nature, 2025](https://doi.org/10.1038/s41586-025-09298-z)
+- [Hwang et al., Genome Medicine, 2026](https://doi.org/10.1186/s13073-026-01682-2)
+- [Tian et al., Science Advances, 2025](https://doi.org/10.1126/sciadv.adu7334)
+- [Hsu et al., Nature Biotechnology, 2013](https://doi.org/10.1038/nbt.2647)
 
-OpenCRISPR-1 has strong positive founding and follow-up reports, but later independent evaluations have not been uniformly consistent across targets and experimental settings. This project therefore treats OpenCRISPR-1 compatibility as a design rule rather than a guarantee of universal performance.
+Experimental findings are context-dependent. This app is a candidate-design aid and does not reproduce the protein/scaffold generative models in the founding paper.
 
-The optional MIT/Hsu specificity calculation is retained as a transparent legacy baseline only. It is not presented as state-of-the-art genome-wide off-target prediction.
+## Licensing and feedback
 
-## Licensing note
+Original repository software is MIT licensed. OpenCRISPR system/model terms remain separate; see [the terms notice](OPENCRISPR_TERMS_NOTICE.md).
 
-The original software in this repository is MIT licensed. OpenCRISPR/OpenCRISPR-1 system/model terms are separate and are not relicensed by this repository. See `OPENCRISPR_TERMS_NOTICE.md`.
+[Report an issue](https://github.com/abdulbasitbehlim/OpenCRISPR1-gRNA-Designer/issues/new?template=feedback.yml).
