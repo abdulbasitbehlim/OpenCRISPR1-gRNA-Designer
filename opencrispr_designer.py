@@ -163,6 +163,12 @@ def scan_opencrispr_sites(sequence: str, gene: str = "target", segment_id: str =
 
 
 def design_from_segments(gene: str, segments: Sequence[Tuple[str, str]], max_guides: int = 50, min_score: float = 0.0) -> List[GuideRNA]:
+    if max_guides < 1 or not 0 <= min_score <= 100:
+        raise ValueError("Use a positive guide count and a score from 0 to 100.")
+    if len({name for name, _ in segments}) != len(segments):
+        raise ValueError("Segment identifiers must be unique.")
+    if sum(len(seq) for _, seq in segments) > 500_000:
+        raise ValueError("Design input is limited to 500,000 bases; supply a target region.")
     guides: List[GuideRNA] = []
     for segment_id, seq in segments:
         guides.extend(scan_opencrispr_sites(seq, gene=gene, segment_id=segment_id))
@@ -178,8 +184,8 @@ def design_from_segments(gene: str, segments: Sequence[Tuple[str, str]], max_gui
 def guide_format_variants(spacer: str) -> List[GuideFormat]:
     """Return common 5'-G guide-expression formats explicitly evaluated in a 2026 OpenCRISPR study."""
     s = clean_dna(spacer)
-    if len(s) != 20:
-        raise ValueError("Guide spacer must be 20 nt.")
+    if len(s) != 20 or "N" in s:
+        raise ValueError("Guide spacer must contain 20 resolved ACGT bases.")
     variants: List[GuideFormat] = []
     if s.startswith("G"):
         variants.append(GuideFormat(
@@ -195,6 +201,8 @@ def guide_format_variants(spacer: str) -> List[GuideFormat]:
         "gX20", "G" + s, 21,
         "An additional 5'-G is appended while retaining the full 20-nt targeting spacer.",
     ))
+    if not s.startswith("G"):
+        variants.append(GuideFormat("X20", s, 20, "Unmodified targeting spacer; promoter-independent delivery or a compatible expression system is required."))
     return variants
 
 
@@ -221,49 +229,24 @@ def mit_specificity(pair_scores: Iterable[float]) -> float:
     return round(100.0 / (1.0 + sum(pair_scores)), 2)
 
 
-def _scan_panel_sites(panel: Mapping[str, str]) -> List[GuideRNA]:
-    sites: List[GuideRNA] = []
-    for name, seq in panel.items():
-        sites.extend(scan_opencrispr_sites(seq, gene=name, segment_id=name))
-    return sites
-
-
 def screen_local_reference(
     guide: str,
     panel: Mapping[str, str],
     max_mismatches: int = 3,
-    exclude_one_exact: bool = True,
+    exclude_one_exact: bool = False,
     max_hits: int = 250,
-) -> Tuple[float, List[OffTargetHit]]:
-    """PAM-aware local FASTA screen using MIT/Hsu as a legacy baseline.
+    *,
+    intended_locus=None,
+) -> Tuple[Optional[float], List[OffTargetHit]]:
+    """Compatibility wrapper; use local_screening.screen_reference for metadata.
 
-    MIT/Hsu (2013) is retained because it is transparent and dependency-free,
-    but later empirical metrics such as CFD and newer ML predictors can better
-    model off-target activity in many settings. Treat this result as a supplied-
-    panel baseline, not as the best available genome-wide specificity estimate.
+    Automatic first-exact exclusion has been removed. Specify a TargetLocus.
     """
-    g = clean_dna(guide)
-    if len(g) != 20:
-        raise ValueError("Specificity screening requires a 20-nt spacer.")
-    hits: List[OffTargetHit] = []
-    exact_excluded = False
-    for site in _scan_panel_sites(panel):
-        pos = mismatch_positions(g, site.spacer)
-        if len(pos) > max_mismatches:
-            continue
-        if exclude_one_exact and not pos and not exact_excluded:
-            exact_excluded = True
-            continue
-        seed_mm = sum(p >= 13 for p in pos)
-        hits.append(OffTargetHit(
-            contig=site.gene, spacer=site.spacer, pam=site.pam,
-            strand=site.strand, start=site.start, mismatches=len(pos),
-            mismatch_positions=pos, seed_mismatches=seed_mm,
-            mit_pair_risk=mit_offtarget_pair_score(g, site.spacer),
-        ))
-    hits.sort(key=lambda h: (h.mismatches, h.seed_mismatches, -h.mit_pair_risk, h.contig, h.start))
-    hits = hits[:max_hits]
-    return mit_specificity(h.mit_pair_risk for h in hits), hits
+    from local_screening import screen_reference
+    if exclude_one_exact:
+        raise ValueError("Automatic exact-hit exclusion is unsafe; supply an explicit intended_locus instead.")
+    result = screen_reference(guide, panel, max_mismatches, intended_locus, max_hits)
+    return result.specificity_score, list(result.hits)
 
 
 def guide_row(g: GuideRNA) -> Dict[str, object]:
@@ -272,6 +255,7 @@ def guide_row(g: GuideRNA) -> Dict[str, object]:
         "PAM": g.pam,
         "Strand": g.strand,
         "Segment": g.segment_id,
+        "Coordinate system": "1-based inclusive; supplied segment",
         "Start": g.start,
         "End": g.end,
         "GC%": g.gc_percent,

@@ -1,83 +1,45 @@
-# OpenCRISPR-1 gRNA Designer — user guide
+# OpenCRISPR 1 gRNA Designer user guide
 
-## Start
+Version 1.4.0. See [the detailed guide](docs/UPDATED_SOFTWARE_GUIDE.md) for the evidence review, audit examples and remaining limitations.
 
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
+## Try it without a database
 
-## Recommended workflow
+Run `python -m streamlit run app.py`, click **Load offline example**, then **Design OpenCRISPR guides**. The demo includes one forward and one reverse target. These synthetic sequences check software behavior only.
 
-1. Choose **Gene lookup** for an online gene record or **Manual sequence / FASTA** for a reviewed locus.
-2. For gene lookup, enter the gene and organism and choose NCBI RefSeq or Ensembl REST.
-3. Set the maximum guide count and minimum sequence-quality score in the sidebar.
-4. Run the design and review provenance warnings before selecting a candidate.
-5. Inspect the candidate table, target strand, segment, coordinates, GC and sequence-quality score.
-6. For the selected spacer, review GX19/gX19/gX20 expression-format alternatives. Do not treat the displayed order as an efficacy ranking.
-7. If you have an intended locus plus suspected near-match sequences, use the optional local FASTA specificity screen.
-8. Export CSV, FASTA or JSON for downstream review.
+## Design your candidates
 
-## Interpreting the results
+1. Choose **Gene lookup**, **Accession ID**, or **Manual sequence / FASTA**.
+2. Select the correct organism and database. Ensembl gene lookup retrieves independent exons. Gene lookup selects one transcript, so choose a stable transcript accession if isoform identity matters.
+3. In manual mode, paste independently reviewed contiguous genomic regions or individual exon records. Do not paste spliced cDNA as though it were contiguous genomic DNA.
+4. Set maximum guides and minimum sequence-quality score, then submit.
+5. Inspect the returned source version, assembly information, warnings and sequence SHA-256.
+6. Review spacer, PAM, strand, segment, start and end. Coordinates are local to the segment, 1-based and inclusive; they are not chromosomal coordinates.
+7. Review expression formats. GX19 has a native first G, gX19 replaces base 1, gX20 adds a G before the intact spacer, and X20 keeps a non-G-starting spacer unchanged. These are spacer formats, not complete sgRNAs or ranked efficacy recommendations.
 
-**OpenCRISPR-1 compatible** means the candidate follows the conservative 20-nt + NGG target architecture supported by the published OpenCRISPR-1 literature. It does not mean guaranteed editing.
+NCBI RNA records without exon annotations now stop with a message directing you to annotated exons or genomic FASTA. A record with several CDS annotations is rejected; select a single gene explicitly. Requested versions that disagree with returned records are rejected.
 
-**Sequence quality** is a transparent heuristic for prioritization. It is not an OpenCRISPR-specific probability or experimentally calibrated efficiency.
+## Screen a small reference panel
 
-**MIT/Hsu specificity** is computed only against the FASTA sequences you supply. A high supplied-panel score does not prove whole-genome specificity.
+Paste the contents of `examples/panel_demo.fasta` into **Reference FASTA** and select the ACGT-repeat demo spacer. Leave mismatch radius at 3. Without specifying an intended locus, all exact matches remain and the result requires review.
 
-## Guide formats
+To identify the demo intended site, enable **Exclude a verified intended locus**. Enter FASTA ID `intended`, start `1`, strand `+`. Run the screen. It verifies the spacer and an NGG PAM at those coordinates, excludes only that site, and retains the duplicate exact match and the one-substitution match.
 
-- GX19: natural first G in a 20-nt spacer.
-- gX19: first base is changed to G; the position-1 targeting mismatch must be considered.
-- gX20: a non-templated G is prepended to the intact 20-nt spacer.
+For a reverse-strand hit, start means the leftmost spacer base on the supplied reference, not the leftmost PAM base and not the spacer's 5-prime base. Check the strand carefully. The screen searches the original 20-base targeting spacer; it does not quantify how 5-prime G expression changes affect activity.
 
-OpenCRISPR-1 showed robustness to these formats in a 2026 study, but target- and system-specific behavior can still vary.
+The panel limit is 2 million bases; display limits range from 1 to 5000 hits. Total counts and the score use every match within the radius, even when fewer rows are displayed. All-N references produce no score. Ambiguous reference bases, a missing intended coordinate or a radius below 3 require review. A small clean panel can still miss real genomic off-target sites.
 
-## Before experimental use
+## Understand and retain results
 
-Confirm genome assembly, gene/transcript and coding context, allele/variant sequence, and genome-wide off-targets with an appropriate genome-aware workflow. Computational ranking does not replace experimental validation.
+PASS means the implemented sequence/panel rules passed. REVIEW means an issue or unresolved context needs attention. FAIL indicates an unsupported sequence/PAM or an additional exact panel match after the intended site is verified. Specificity remains NOT SCREENED without a completed panel search.
 
-## Validation
+Download CSV for tables, FASTA for targeting spacers and JSON for the full audit details. Keep the original target and reference FASTA with the JSON. A sequence hash identifies the input but does not reconstruct the sequence or prove biological correctness.
 
-Every generated guide receives an overall PASS, REVIEW or FAIL result. Select a guide to inspect each check and its explanation. The local specificity status remains **NOT SCREENED** until you provide a FASTA reference panel and run the MIT/Hsu screen.
+Changing panel text, mismatch radius, intended coordinate or display limit clears stored panel results. A new design clears previous screens. Changing sidebar design settings requires resubmitting before results and exports are shown.
 
-Use **Quick validation of an existing OpenCRISPR guide** near the top of the app to check a 20-nt spacer plus its actual three-base PAM. This quick mode validates sequence/PAM compatibility and expression-format flags only; it cannot prove that the target exists at a genomic locus or that the guide is genome-wide specific.
+## API migration
 
-After a local-reference screen, the validator updates the specificity status for that spacer and the updated result is included in exports.
+`screen_local_reference` no longer accepts `exclude_one_exact=True`; this raises an actionable error. Use `local_screening.screen_reference` with an explicit `TargetLocus` to obtain complete result metadata. The old tuple wrapper returns only the score and retained display hits; its list length is not the total number of hits when capped.
 
-## 2026 evidence-status note
+## Boundaries
 
-Do not interpret an OpenCRISPR-1 compatibility PASS as proof that the nuclease will outperform SpCas9 at your locus. The literature now contains conflicting evaluations. Ruffolo et al. (2025) reported favorable performance; Tian et al. (2025) reported less favorable on/off-target behavior in their comparison; Hwang et al. (2026) explicitly discussed the discrepancy and then reported favorable head-to-head results under their own conditions. Benchmark your loci and delivery context experimentally.
-
-## Specificity-screen interpretation
-
-The built-in supplied-FASTA screen uses **MIT/Hsu (2013) only as a legacy baseline**. It is retained because it is transparent and dependency-free. It is not state-of-the-art: CFD and later empirical/ML approaches can perform better on validated off-target datasets.
-
-Use the local screen to inspect a small supplied panel, not to claim genome-wide specificity. Before experimental use, use an appropriate genome-aware search and validated scoring/experimental workflow.
-
-## Reproducibility and provenance
-
-After sequence retrieval, expand **Sequence provenance and reproducibility** and retain:
-
-- accession/source version;
-- assembly or genomic accession;
-- annotation release/date;
-- UTC retrieval time;
-- sequence SHA-256.
-
-These values are also included in JSON export. The sequence hash allows you to detect a future public-record change even when the gene name is unchanged.
-
-## Ambiguous IUPAC sequence
-
-Ambiguity codes are normalized to `N`. Spacer windows containing ambiguity are skipped instead of being treated as ordinary mismatches. An unresolved nucleotide is allowed only at the degenerate N position of an otherwise resolved NGG/CCN PAM. Ambiguity count and codes are reported in provenance.
-
-## UI testing note
-
-The package includes a static UI contract test, but Streamlit could not be installed/launched in the build environment. Run `UI_TEST_CHECKLIST.md` locally before deployment or reviewer handoff.
-
-## Reviewer/release workflow (v1.3.1)
-
-Freeze the exact target sequence/assembly and its SHA-256 before comparing designers. Run CHOPCHOP (or another comparator) with the same 20-nt + NGG and region assumptions, export a `guide` column, and calculate concordance with `benchmarks/concordance.py`. Do not treat generic CHOPCHOP ranking as an OpenCRISPR-1 efficacy ground truth.
-
-Automated core QA at artifact build: **34 tests, 88% branch-aware coverage**. Numerical coverage excludes `app.py`; complete `UI_TEST_CHECKLIST.md` interactively before release.
+The sequence score is a heuristic, not an editing probability. The panel search is NGG-only, substitution-only and local. Genomic mapping, variant checking, genome-wide search, scaffold choice, editing-outcome prediction, delivery and experimental confirmation remain separate work. The app does not run the founding paper's AI protein or guide-scaffold generator.

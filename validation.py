@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from typing import Iterable, List, Optional, Sequence
 import re
 
-from opencrispr_designer import GuideRNA, OffTargetHit, guide_format_variants
+from opencrispr_designer import GuideRNA, OffTargetHit, guide_format_variants, gc_percent, sequence_quality_score
+from local_screening import PanelScreen
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,7 @@ def validate_opencrispr_guide(
     local_hits: Optional[Iterable[OffTargetHit]] = None,
     specificity_score: Optional[float] = None,
     min_specificity_review: float = 50.0,
+    panel_screen: Optional[PanelScreen] = None,
 ) -> ValidationReport:
     checks: List[ValidationCheck] = []
     spacer = (guide.spacer or "").upper()
@@ -85,7 +87,8 @@ def validate_opencrispr_guide(
         "The guide object must originate from or satisfy the supported OpenCRISPR-1 design path.",
     )
 
-    gc = guide.gc_percent
+    gc = gc_percent(spacer) if canonical else 0.0
+    quality = sequence_quality_score(spacer) if canonical else 0.0
     _add(
         checks,
         "GC content",
@@ -97,8 +100,8 @@ def validate_opencrispr_guide(
     _add(
         checks,
         "Sequence-quality threshold",
-        "PASS" if guide.sequence_score >= min_sequence_score else "REVIEW",
-        f"{guide.sequence_score:.1f} / threshold {min_sequence_score:.1f}",
+        "PASS" if quality >= min_sequence_score else "REVIEW",
+        f"{quality:.1f} / threshold {min_sequence_score:.1f}",
         "This is the app's transparent heuristic ranking threshold, not a learned OpenCRISPR efficacy probability.",
     )
 
@@ -132,7 +135,26 @@ def validate_opencrispr_guide(
     except Exception as exc:
         _add(checks, "5′-G expression format", "FAIL", "Unavailable", str(exc))
 
-    if local_hits is None and specificity_score is None:
+    if panel_screen is not None:
+        if panel_screen.guide != spacer:
+            raise ValueError("Screening result belongs to a different targeting spacer.")
+        extra_exact = panel_screen.mismatch_counts[0]
+        one_mm = panel_screen.mismatch_counts[1] if panel_screen.max_mismatches else 0
+        score = panel_screen.specificity_score
+        if panel_screen.intended_site_excluded and extra_exact:
+            level = "FAIL"
+        elif (not panel_screen.intended_site_excluded or panel_screen.ambiguous_bases
+              or not panel_screen.scanned_sites or one_mm
+              or panel_screen.max_mismatches < 3
+              or (score is not None and score < min_specificity_review)):
+            level = "REVIEW"
+        else:
+            level = "PASS"
+        specificity_status = f"{level} (SUPPLIED PANEL)"
+        _add(checks, "Local specificity", level,
+             f"{panel_screen.total_hits} total hit(s); {extra_exact} exact; {one_mm} one-mismatch; MIT={score}",
+             "Only an explicitly confirmed coordinate is excluded. Counts include all hits within the radius, regardless of the display cap. A missing intended locus, ambiguous reference, no searchable sites, or radius below 3 requires review. This remains an NGG substitution-only supplied-panel screen.")
+    elif local_hits is None and specificity_score is None:
         specificity_status = "NOT SCREENED"
         _add(
             checks,

@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 .env
 results/
+
+.coverage
+coverage.xml
+build/
+*.egg-info/

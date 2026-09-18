@@ -1,141 +1,53 @@
-# OpenCRISPR-1 gRNA Designer v1.3.1 — architecture and scientific design
+# OpenCRISPR 1 Designer architecture
 
-## 1. Scope and current evidence status
+Version 1.4.0 retains the Python/Streamlit application and separates target discovery from local specificity screening.
 
-This application designs conservative OpenCRISPR-1-compatible guide candidates using a 20-nt spacer and NGG PAM, while deliberately avoiding an unsupported universal “OpenCRISPR efficacy score.”
+| File | Responsibility |
+| --- | --- |
+| `app.py` | Input forms, offline demo, source warnings, guide inspection, coordinate confirmation and exports |
+| `sequence_sources.py` | FASTA validation, NCBI/Ensembl gene lookup, independent annotation intervals and sequence provenance |
+| `accession_sources.py` | Single accession lookup and requested-version verification |
+| `opencrispr_designer.py` | Both-strand NGG discovery, transparent ranking, format display and legacy tuple wrapper |
+| `local_screening.py` | Streaming NGG reference search, coordinate exclusion, complete counts, bounded display and panel fingerprint |
+| `validation.py` | Sequence checks and metadata-aware PASS/REVIEW/FAIL rules |
+| `workflow.py` | Design identity, stale-state invalidation and consistent export construction |
 
-The literature is **not treated as settled**. Ruffolo et al. (Nature, 2025) reported strong activity/specificity for OpenCRISPR-1. Tian et al. (Science Advances, 2025) reported lower on-target performance and more off-target activity than comparator systems in their evaluation. Hwang et al. (Genome Medicine, 2026) explicitly described these evaluations as conflicting, then reported Cas9-level on-target activity and substantially reduced off-target activity in their own head-to-head experiments. 2026 rice studies further support activity in plant systems. These differences mean OpenCRISPR-1 performance should be considered **context-dependent and still under independent validation**, not universally generalizable.
+## Coordinate contract
 
-Accordingly, a software compatibility PASS means “meets the implemented sequence/PAM rules,” not “OpenCRISPR-1 will edit this locus efficiently or specifically.”
+Start/end are 1-based inclusive coordinates of the spacer within the supplied segment. Minus-strand spacers are reverse-complemented into synthesis orientation, but start is still the leftmost reference spacer base. An NGG motif is tested in the corresponding strand orientation. Chromosome mapping is not inferred from transcript coordinates.
 
-## 2. Modules
+## Screening contract
 
-```text
-app.py
-  ├─ opencrispr_designer.py # NGG discovery, ranking, formats, legacy MIT/Hsu panel screen
-  ├─ sequence_sources.py    # NCBI / Ensembl / manual FASTA + reproducibility metadata
-  └─ validation.py          # PASS / REVIEW / FAIL checks
+`screen_reference(guide, panel, max_mismatches=3, intended_locus=None, max_hits=250)` returns `PanelScreen`. The intended locus is a `TargetLocus(contig, start, strand)` referring to the panel FASTA. It is excluded only after an exact spacer and supported PAM are found there. An invalid coordinate raises an error; it never triggers first-match exclusion.
 
-tests/
-  ├─ scientific-core tests
-  ├─ source/provenance tests
-  ├─ validation tests
-  └─ static Streamlit UI contract test
+Every resolved NGG site on both strands is considered. The search supports 0–4 substitutions, with no indels or bulges. Counts and risk sums are accumulated across all accepted hits. A bounded heap retains only the display subset. The panel length is capped at 2 million bases and displayed hits at 5000. No sequence-quality ranking is computed for reference sites.
+
+`PanelScreen` includes normalized reference SHA-256, base/record counts, ambiguous-base count, searchable-site count, intended coordinate/status, mismatch histogram, full hit count, retained hits, settings, timestamp and method. No searchable sites yields a null score. Ambiguity and unknown intended context cannot yield a panel validation PASS. The score remains an uncalibrated MIT/Hsu legacy summary.
+
+## State and exports
+
+The design key hashes the input fingerprint/version and candidate segment, coordinates, strand, spacer and PAM. New design submissions clear old results before retrieval. Panel settings have a separate identity; changing them clears every stored panel result. The same export helper supplies the visible table and downloadable data. Counts in exported JSON come from the full screen, never from the display list length.
+
+## Retrieval boundaries
+
+Duplicate and empty FASTA records are rejected. NCBI extraction treats each annotated exon and CDS part independently; it does not use a compound-feature bounding span. RNA records lacking exon boundaries and multi-CDS records are blocked. Ensembl returns one selected transcript's exons, which can include untranslated regions. All source intervals remain local coordinates. These checks do not replace genome mapping or exon coverage validation.
+
+## Migration from v1.3.1
+
+Automatic `exclude_one_exact=True` is removed. Use the structured API instead:
+
+```python
+from local_screening import TargetLocus, screen_reference
+result = screen_reference(
+    'ACGTACGTACGTACGTACGT',
+    {'intended': 'ACGTACGTACGTACGTACGTAGG'},
+    intended_locus=TargetLocus('intended', 1, '+'),
+)
+print(result.total_hits, result.specificity_score)
 ```
 
-## 3. Target compatibility
+The legacy tuple wrapper is retained for callers that need only score and display hits. `len(hits)` is not the full hit count when display truncation occurs. Validation and the UI use the structured result.
 
-The conservative default is:
+## Verification boundary
 
-- 20-nt targeting spacer;
-- NGG PAM;
-- both DNA strands scanned;
-- independent sequence segments scanned separately.
-
-This is a compatibility rule derived from published OpenCRISPR-1 targeting behavior and conventional SpCas9-guide compatibility. It is not a claim that all NGG guides have comparable activity.
-
-## 4. Guide-expression formats
-
-`guide_format_variants()` reports GX19, gX19, and gX20 configurations evaluated in the 2026 Genome Medicine study. The app does not assign a universal “best” format.
-
-For a non-G-starting targeting spacer, gX19 changes position 1 and is explicitly flagged; gX20 retains the full 20-nt targeting sequence with an added 5′ G.
-
-## 5. Sequence acquisition and reproducibility
-
-`GeneSequenceRecord` stores:
-
-- source and accession;
-- source record/version;
-- assembly or genomic accession when available;
-- annotation release/date when available;
-- UTC retrieval timestamp;
-- SHA-256 fingerprint of the exact sequence segments used;
-- ambiguity count/codes;
-- warnings.
-
-NCBI mode attempts to retain the versioned RefSeq accession plus linked chromosome/genomic accession version and record date. Ensembl mode records a versioned transcript ID when available, the returned assembly name, and current Ensembl REST release. Manual FASTA remains explicitly user-supplied/assembly-unspecified unless the user provides that context.
-
-The SHA-256 fingerprint is the reproducibility anchor: if a public record changes later, the exported hash can reveal that the exact sequence input is no longer identical.
-
-## 6. Ambiguous IUPAC bases
-
-Ambiguous input is not silently treated as mismatch evidence:
-
-1. non-ACGT IUPAC ambiguity codes are normalized to `N`;
-2. candidate spacers containing `N` are skipped;
-3. ambiguity may be accepted only at the degenerate `N` position of an otherwise resolved NGG/CCN PAM;
-4. ambiguity in required G/G or C/C positions prevents PAM recognition;
-5. provenance records ambiguity count and codes.
-
-## 7. Candidate ranking
-
-`sequence_quality_score()` is an explainable shortlist heuristic using GC, poly-T/homopolymer review terms and small sequence-context terms. It is **not** trained on OpenCRISPR-1 experimental outcomes and is never labelled as editing probability.
-
-## 8. Local specificity: MIT/Hsu is a legacy baseline
-
-`screen_local_reference()` implements the 2013 MIT/Hsu positional mismatch score because it is transparent and dependency-free. v1.3.1 now labels it everywhere as **“MIT/Hsu 2013 legacy baseline (supplied FASTA panel)”**.
-
-This is intentionally not described as state-of-the-art. Independent benchmarking in CRISPOR found CFD more discriminative than MIT on validated off-target datasets (Haeussler et al., 2016), and later empirical/ML approaches can further improve prediction depending on data and context. The correct interpretation is therefore:
-
-- useful transparent baseline for a small user-supplied panel;
-- not a replacement for CFD or validated modern predictors;
-- not genome-wide specificity;
-- not OpenCRISPR-1-specific calibration.
-
-The software does **not** fabricate a CFD value because a correct CFD implementation requires the published mismatch/PAM parameterization and careful backend validation. A future plugin can add CFD or a validated genome-aware backend without changing the core architecture.
-
-## 9. Validation layer
-
-Hard checks: 20-nt resolved spacer, NGG PAM, OpenCRISPR compatibility flag. Review checks: preferred GC, transparent quality threshold, poly-T/homopolymers, 5′-G format implications, and local specificity findings.
-
-A local additional exact hit after excluding one presumed intended target is a hard supplied-panel failure; close hits or low legacy MIT/Hsu score are review flags.
-
-## 10. Streamlit UI
-
-The UI explicitly shows:
-
-- a 2026 evidence-status warning about conflicting independent evaluations;
-- sequence provenance and SHA-256 fingerprint;
-- ambiguity warnings;
-- guide validation;
-- GX19/gX19/gX20 formats;
-- legacy MIT/Hsu specificity language;
-- CSV/FASTA/JSON exports.
-
-JSON exports include provenance, evidence-status wording, and the specificity-method limitation.
-
-## 11. Testing status
-
-v1.3.1 passes **34 automated tests** with **88% branch-aware core coverage** covering both-strand NGG discovery, segment isolation, ambiguity rules, guide formats, MIT/Hsu calculations, local panel behavior, provenance fingerprints, validation, and export labels.
-
-`tests/test_ui_contract.py` statically parses `app.py` and verifies that the evidence warning, provenance, legacy-specificity label, and validator are present. **This is not an interactive Streamlit browser test.** Streamlit is not installed in the artifact environment and PyPI access is unavailable, so the interface could not be launched here. Run the local `UI_TEST_CHECKLIST.md` before calling the UI release-tested.
-
-## 12. Scientific boundaries
-
-- OpenCRISPR-1 generalizability remains an empirical question across loci, cell types, delivery systems, guide formats, and organisms.
-- NGG compatibility is not efficacy prediction.
-- MIT/Hsu is a legacy panel baseline, not modern genome-wide specificity.
-- Exact assembly/genotype and variant context must be verified before experimental use.
-- Computational validation does not replace experimental off-target measurement.
-
-## 13. Key references
-
-- Ruffolo JA et al. *Nature*. 2025. doi:10.1038/s41586-025-09298-z.
-- Tian R et al. *Science Advances*. 2025;11:eadu7334. doi:10.1126/sciadv.adu7334.
-- Hwang H-Y et al. *Genome Medicine*. 2026;18:109. doi:10.1186/s13073-026-01682-2.
-- Doench JG et al. *Nature Biotechnology*. 2016;34:184-191. doi:10.1038/nbt.3437.
-- Haeussler M et al. *Genome Biology*. 2016. doi:10.1186/s13059-016-1012-2.
-- Hsu PD et al. *Nature Biotechnology*. 2013;31:827-832. doi:10.1038/nbt.2647.
-
-## 14. External comparison protocol
-
-A fresh CHOPCHOP concordance run is intentionally not claimed from this artifact environment. `benchmarks/EXTERNAL_COMPARISON_PROTOCOL.md` requires the comparator to use the same frozen input sequence/assembly, 20-nt + NGG model, target segments and filtering scope. `benchmarks/concordance.py` then reports guides found by both, this project only, and the external tool only. Differences must be attributed to PAM handling, strand/segment boundaries, ranking/filtering, or database/version differences rather than described as unexplained superiority.
-
-## 15. CI, packaging and release reproducibility
-
-- Runtime/developer dependencies are exactly pinned.
-- GitHub Actions tests Python 3.11, 3.12 and 3.13 on pushes/pull requests and enforces at least 80% core coverage.
-- `coverage.txt` and `coverage.xml` preserve the measured artifact result.
-- `pyproject.toml` installs the scientific core; Docker/Compose provides a one-command app environment.
-- `CITATION.cff` and `.zenodo.json` are prepared for a later tagged archive; no DOI is claimed before it is minted.
-- `OPENCRISPR_TERMS_NOTICE.md` separates this repository's MIT-licensed code from Profluent's third-party OpenCRISPR-1 technology/terms.
+Core numerical coverage excludes the Streamlit file; three AppTest tests exercise actual form submission, screening, invalidation and offline demo reruns. Retrieval tests use mocked public-service responses. Synthetic examples check correctness, not nuclease efficacy. Primary references and limitations are documented in `docs/UPDATED_SOFTWARE_GUIDE.md`.

@@ -69,7 +69,7 @@ def test_local_reference_excludes_one_intended_exact_and_keeps_second_exact():
     spacer = "ACGTACGTACGTACGTACGT"
     locus = spacer + "AGG"
     panel = {"intended": locus, "duplicate": locus}
-    spec, hits = screen_local_reference(spacer, panel, max_mismatches=0, exclude_one_exact=True)
+    spec, hits = screen_local_reference(spacer, panel, max_mismatches=0, intended_locus=__import__("local_screening").TargetLocus("intended", 1, "+"))
     assert len(hits) == 1
     assert hits[0].mismatches == 0
     assert spec == 50.0

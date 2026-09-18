@@ -64,7 +64,7 @@ def test_fetch_ncbi_gene_mocked_preserves_version_assembly_and_exons(monkeypatch
     assert len(rec.sequence_sha256) == 64
 
 
-def test_fetch_ncbi_gene_mocked_no_cds_uses_transcript(monkeypatch):
+def test_fetch_ncbi_gene_rejects_transcript_without_exon_boundaries(monkeypatch):
     gb = _genbank_text(with_exons=False, with_cds=False)
 
     def fake_get(url, *, params=None, headers=None, retries=3, timeout=30):
@@ -79,9 +79,8 @@ def test_fetch_ncbi_gene_mocked_no_cds_uses_transcript(monkeypatch):
         raise AssertionError(url)
 
     monkeypatch.setattr(ss, "_get", fake_get)
-    rec = ss.fetch_ncbi_gene("X", "Homo sapiens")
-    assert rec.segments[0][0] == "transcript"
-    assert any("no cds" in w.lower() for w in rec.warnings)
+    with pytest.raises(ValueError, match="exon boundaries"):
+        ss.fetch_ncbi_gene("X", "Homo sapiens")
 
 
 def test_fetch_ncbi_gene_error_branches(monkeypatch):

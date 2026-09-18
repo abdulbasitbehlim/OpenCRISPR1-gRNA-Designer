@@ -1,0 +1,132 @@
+{
+  "kind": "Synthetic software correctness examples, not wet-lab validation",
+  "app_version": "1.4.0",
+  "examples": [
+    {
+      "example": "Unconfirmed exact match is retained",
+      "observed": {
+        "hits": 1,
+        "score": 50.0
+      },
+      "expected": {
+        "hits": 1,
+        "score": 50.0
+      },
+      "status": "PASS"
+    },
+    {
+      "example": "Confirmed intended coordinate is excluded",
+      "observed": {
+        "hits": 0,
+        "score": 100.0
+      },
+      "expected": {
+        "hits": 0,
+        "score": 100.0
+      },
+      "status": "PASS"
+    },
+    {
+      "example": "Second exact locus remains visible",
+      "observed": 1,
+      "expected": 1,
+      "status": "PASS"
+    },
+    {
+      "example": "Display limits 1 250 and 1000 preserve score",
+      "observed": [
+        0.33,
+        0.33,
+        0.33
+      ],
+      "expected": [
+        0.33,
+        0.33,
+        0.33
+      ],
+      "status": "PASS"
+    },
+    {
+      "example": "Duplicate FASTA names",
+      "observed": "Rejected with actionable message",
+      "expected": "Rejected with actionable message",
+      "status": "PASS"
+    },
+    {
+      "example": "All ambiguous reference has no score",
+      "observed": null,
+      "expected": null,
+      "status": "PASS"
+    },
+    {
+      "example": "Reverse strand coordinate 7 is verified",
+      "observed": true,
+      "expected": true,
+      "status": "PASS"
+    },
+    {
+      "example": "One substitution at spacer position 1",
+      "observed": [
+        1
+      ],
+      "expected": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "example": "Transcript without exon boundaries",
+      "observed": "Rejected with actionable message",
+      "expected": "Rejected with actionable message",
+      "status": "PASS"
+    },
+    {
+      "example": "Two short exons cannot create a junction target",
+      "observed": "Rejected with actionable message",
+      "expected": "Rejected with actionable message",
+      "status": "PASS"
+    },
+    {
+      "example": "Compound CDS excludes intervening intron",
+      "observed": [
+        30,
+        30
+      ],
+      "expected": [
+        30,
+        30
+      ],
+      "status": "PASS"
+    },
+    {
+      "example": "Non G spacer has unmodified option",
+      "observed": "ACGTACGTACGTACGTACGT",
+      "expected": "ACGTACGTACGTACGTACGT",
+      "status": "PASS"
+    },
+    {
+      "example": "Changed panel invalidates prior result",
+      "observed": {},
+      "expected": {},
+      "status": "PASS"
+    },
+    {
+      "example": "Resolved plus strand site uses coordinates 1 to 20",
+      "observed": [
+        [
+          1,
+          20,
+          "+"
+        ]
+      ],
+      "expected": [
+        [
+          1,
+          20,
+          "+"
+        ]
+      ],
+      "status": "PASS"
+    }
+  ]
+}
