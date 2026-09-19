@@ -17,6 +17,38 @@ from validation import validate_opencrispr_guide, validation_summary_row
 
 from local_screening import TargetLocus, screen_reference
 from workflow import APP_VERSION, clear_design_state, guide_key, reset_panel_if_changed, export_bundle
+
+def _table_value(value):
+    """Convert structured values into readable text for UI tables."""
+    if value is None or value == "":
+        return "—"
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, dict):
+        return " | ".join(
+            f"{str(key).replace('_', ' ').title()}: {_table_value(item)}"
+            for key, item in value.items()
+        ) or "None"
+    if isinstance(value, (list, tuple, set)):
+        items = list(value)
+        if isinstance(value, set):
+            items = sorted(items, key=str)
+        return ", ".join(_table_value(item) for item in items) or "None"
+    return str(value)
+
+
+def key_value_table(data, field_label="Field", value_label="Value"):
+    """Return a consistent two-column table instead of exposing raw JSON in the UI."""
+    return pd.DataFrame(
+        [
+            {
+                field_label: str(key).replace("_", " ").title(),
+                value_label: _table_value(value),
+            }
+            for key, value in data.items()
+        ]
+    )
+
 st.set_page_config(page_title="OpenCRISPR-1 gRNA Designer", page_icon="🧬", layout="wide")
 
 dark = st.sidebar.toggle("Dark mode", value=True)
@@ -164,7 +196,11 @@ if "oc_guides" in st.session_state:
     st.caption("Coordinates are 1-based and inclusive within each supplied segment. They are not chromosome coordinates.")
     with st.expander("Sequence provenance and reproducibility"):
         st.caption(f"sequence SHA-256: {record.sequence_sha256}")
-        st.json(record.provenance_dict())
+        st.dataframe(
+            key_value_table(record.provenance_dict(), "Provenance field", "Value"),
+            hide_index=True,
+            use_container_width=True,
+        )
     for warning in record.warnings:
         st.warning(warning)
     if not guides:
