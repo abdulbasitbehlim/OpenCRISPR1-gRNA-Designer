@@ -13,6 +13,8 @@ def test_streamlit_ui_source_contract():
         "MIT/Hsu legacy specificity",
         "sequence SHA-256",
         "Quick validation of an existing OpenCRISPR guide",
+        "Provenance field",
     ]
     for marker in required:
         assert marker in text
+    assert "st.json(" not in text
