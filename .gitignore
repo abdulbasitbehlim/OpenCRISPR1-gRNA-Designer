@@ -9,3 +9,5 @@ results/
 coverage.xml
 build/
 *.egg-info/
+coverage.txt
+pytest_cov_output.txt
