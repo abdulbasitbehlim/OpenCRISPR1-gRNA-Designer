@@ -2,6 +2,8 @@
 
 A Python/Streamlit workbench for discovering conservative 20-nt + NGG targeting spacers, reviewing sequence quality, and checking near matches in a supplied FASTA panel. Scores are **not OpenCRISPR-specific editing probabilities**.
 
+**Keywords:** `bioinformatics` · `crispr` · `grna` · `opencrispr` · `spcas9` · `streamlit` · `computational-biology` · `genome-editing`
+
 ## Run locally
 
 Python 3.11 or newer:
