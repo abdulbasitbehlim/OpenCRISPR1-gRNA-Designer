@@ -1,3 +1,24 @@
+# ============================================================================
+# TEST VALIDATION
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: These tests check the OpenCRISPR-1 validation rules.
+#
+# HOW TO READ THIS FILE:
+# 1. Each test creates an input or result condition.
+# 2. The validation function is called.
+# 3. Assertions confirm that the correct validation outcome is produced.
+# 4. The expected scientific/validation behaviour is kept unchanged.
+#
+# TEST FUNCTIONS:
+# - _guide
+# - test_opencrispr_core_validation_passes
+# - test_non_ngg_pam_fails
+# - test_additional_exact_local_hit_fails_specificity
+# - test_degenerate_n_pam_position_is_structurally_accepted
+# ============================================================================
+
 from opencrispr_designer import GuideRNA, OffTargetHit
 from validation import validate_opencrispr_guide
 
