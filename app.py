@@ -1,3 +1,23 @@
+# ============================================================================
+# APP
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: Builds the Streamlit interface and connects sequence input, guide design, screening, validation and reporting.
+#
+# HOW TO READ THIS FILE:
+# 1. Start with imports and constants to see the dependencies and fixed settings.
+# 2. Read one function/class at a time rather than the whole file at once.
+# 3. Follow the workflow from sequence input -> candidate discovery -> screening -> validation.
+# 4. Scientific calculations, thresholds, validation rules and public APIs are
+#    intentionally preserved while readability explanations are added.
+#
+# MAIN TOP-LEVEL PARTS:
+# - function: _table_value
+# - function: key_value_table
+# - function: load_offline_example
+# ============================================================================
+
 #!/usr/bin/env python3
 """Professional Streamlit dashboard for OpenCRISPR-1 guide design."""
 from __future__ import annotations
@@ -18,6 +38,10 @@ from validation import validate_opencrispr_guide, validation_summary_row
 from local_screening import TargetLocus, screen_reference
 from workflow import APP_VERSION, clear_design_state, guide_key, reset_panel_if_changed, export_bundle
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: _table_value
+# ----------------------------------------------------------------------------
 def _table_value(value):
     """Convert structured values into readable text for UI tables."""
     if value is None or value == "":
@@ -37,6 +61,10 @@ def _table_value(value):
     return str(value)
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: key_value_table
+# ----------------------------------------------------------------------------
 def key_value_table(data, field_label="Field", value_label="Value"):
     """Return a consistent two-column table instead of exposing raw JSON in the UI."""
     return pd.DataFrame(
@@ -112,6 +140,10 @@ with st.expander("Quick validation of an existing OpenCRISPR guide"):
         except Exception as exc:
             st.error(str(exc))
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: load_offline_example
+# ----------------------------------------------------------------------------
 def load_offline_example():
     clear_design_state(st.session_state)
     st.session_state["oc_input_mode"] = "Manual sequence / FASTA"
