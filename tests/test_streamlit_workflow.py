@@ -1,3 +1,26 @@
+# ============================================================================
+# TEST STREAMLIT WORKFLOW
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: This file contains automated checks for the OpenCRISPR-1 gRNA
+# Designer. The tests help make sure scientific and interface behaviour does
+# not change accidentally when the program is edited.
+#
+# HOW TO READ A TEST:
+# 1. Prepare sample input or a reusable fixture.
+# 2. Call the function or workflow being tested.
+# 3. Use assertions to compare the actual result with the expected result.
+# 4. Existing test logic and expected scientific outcomes are unchanged.
+#
+# MAIN TOP-LEVEL TESTS / HELPERS:
+# - function: label
+# - function: manual_app
+# - function: test_screen_result_persists_then_clears_when_reference_or_design_changes
+# - function: test_verified_coordinate_updates_validation_and_setting_change_hides_exports
+# - function: test_offline_example_loads_and_designs_without_network
+# ============================================================================
+
 """Exercise real Streamlit reruns, rather than inspecting UI source strings."""
 from pathlib import Path
 from streamlit.testing.v1 import AppTest
