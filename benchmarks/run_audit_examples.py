@@ -1,3 +1,22 @@
+# ============================================================================
+# RUN AUDIT EXAMPLES
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: Runs reproducible audit examples used to inspect important workflow decisions.
+#
+# HOW TO READ THIS FILE:
+# 1. Start with imports and constants to see the dependencies and fixed settings.
+# 2. Read one function/class at a time rather than the whole file at once.
+# 3. Follow the workflow from sequence input -> candidate discovery -> screening -> validation.
+# 4. Scientific calculations, thresholds, validation rules and public APIs are
+#    intentionally preserved while readability explanations are added.
+#
+# MAIN TOP-LEVEL PARTS:
+# - function: add
+# - function: rejected
+# ============================================================================
+
 """Run deterministic software examples; no experimental efficacy is measured."""
 from pathlib import Path
 import sys
@@ -14,9 +33,17 @@ from workflow import reset_panel_if_changed
 S='ACGTACGTACGTACGTACGT'
 L=S+'AGG'
 rows=[]
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: add
+# ----------------------------------------------------------------------------
 def add(name, actual, expected):
     assert actual == expected, (name,actual,expected)
     rows.append({'example':name,'observed':actual,'expected':expected,'status':'PASS'})
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: rejected
+# ----------------------------------------------------------------------------
 def rejected(name,fn,part):
     try: fn()
     except ValueError as exc:
