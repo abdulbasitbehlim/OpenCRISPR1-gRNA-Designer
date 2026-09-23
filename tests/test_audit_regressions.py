@@ -1,3 +1,47 @@
+# ============================================================================
+# TEST AUDIT REGRESSIONS
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: This file contains automated checks for the OpenCRISPR-1 gRNA
+# Designer. The tests help make sure scientific and interface behaviour does
+# not change accidentally when the program is edited.
+#
+# HOW TO READ A TEST:
+# 1. Prepare sample input or a reusable fixture.
+# 2. Call the function or workflow being tested.
+# 3. Use assertions to compare the actual result with the expected result.
+# 4. Existing test logic and expected scientific outcomes are unchanged.
+#
+# MAIN TOP-LEVEL TESTS / HELPERS:
+# - function: guide
+# - function: test_unconfirmed_exact_is_never_silently_excluded
+# - function: test_cap_cannot_change_total_score_or_counts
+# - function: test_confirmed_single_locus_and_reverse_coordinates
+# - function: test_bad_on_target_coordinates_are_rejected
+# - function: test_coordinate_cannot_exclude_mismatched_site
+# - function: test_malformed_fasta_is_rejected
+# - function: test_empty_or_oversized_panel_is_rejected
+# - function: test_ambiguous_or_wrong_length_query_is_rejected
+# - function: test_invalid_search_settings
+# - function: test_no_searchable_sites_produces_no_score
+# - function: test_ambiguity_and_narrow_radius_require_review
+# - function: test_hit_order_prefers_exact_over_earlier_near_match
+# - function: test_independent_oracle_for_both_strands_and_mismatches
+# - function: record
+# - function: test_short_annotated_exons_are_not_rejoined
+# - function: test_missing_transcript_exons_and_multiple_cds_are_blocked
+# - function: test_genomic_compound_cds_excludes_intron_and_preserves_reverse_orientation
+# - function: test_exon_cds_intersections_use_parts_not_bounding_span
+# - function: test_unannotated_small_genomic_record_allowed_with_context_warning
+# - function: test_ensembl_requested_version_is_not_silently_replaced
+# - function: test_design_limits_and_duplicate_segments
+# - function: test_native_format_for_non_g_spacer_is_available
+# - function: test_export_and_state_do_not_reuse_old_panel_or_target
+# - function: test_validator_rejects_cross_guide_screen
+# - plus 1 additional tests/helpers
+# ============================================================================
+
 """Regression tests for observed failure modes and independent search oracles."""
 import random
 import json
