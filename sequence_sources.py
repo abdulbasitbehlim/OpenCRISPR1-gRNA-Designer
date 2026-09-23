@@ -1,3 +1,33 @@
+# ============================================================================
+# SEQUENCE SOURCES
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: Loads, cleans and records sequence data before guide discovery begins.
+#
+# HOW TO READ THIS FILE:
+# 1. Start with imports and constants to see the dependencies and fixed settings.
+# 2. Read one function/class at a time rather than the whole file at once.
+# 3. Follow the workflow from sequence input -> candidate discovery -> screening -> validation.
+# 4. Scientific calculations, thresholds, validation rules and public APIs are
+#    intentionally preserved while readability explanations are added.
+#
+# MAIN TOP-LEVEL PARTS:
+# - class: GeneSequenceRecord
+# - function: _ambiguity_fields
+# - function: _append_ambiguity_warning
+# - function: _ensembl_release
+# - function: _ncbi_genomic_record
+# - function: normalize_species_name
+# - function: parse_multifasta
+# - function: segments_from_ncbi_record
+# - function: manual_record
+# - function: _get
+# - function: fetch_ncbi_gene
+# - function: fetch_ensembl_gene
+# - function: fetch_gene
+# ============================================================================
+
 #!/usr/bin/env python3
 """Gene/sequence retrieval for OpenCRISPR-1 guide design."""
 from __future__ import annotations
@@ -69,11 +99,19 @@ class GeneSequenceRecord:
         }
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: _ambiguity_fields
+# ----------------------------------------------------------------------------
 def _ambiguity_fields(raw_seq: str) -> Tuple[int, Tuple[str, ...]]:
     a = ambiguity_summary(raw_seq)
     return int(a["count"]), tuple(a["codes"])
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: _append_ambiguity_warning
+# ----------------------------------------------------------------------------
 def _append_ambiguity_warning(warnings: List[str], count: int, codes: Tuple[str, ...]) -> None:
     if count:
         warnings.append(
@@ -84,6 +122,10 @@ def _append_ambiguity_warning(warnings: List[str], count: int, codes: Tuple[str,
         )
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: _ensembl_release
+# ----------------------------------------------------------------------------
 def _ensembl_release(headers: Dict[str, str]) -> str:
     try:
         data = _get(f"{ENSEMBL}/info/data", headers=headers).json()
@@ -93,6 +135,10 @@ def _ensembl_release(headers: Dict[str, str]) -> str:
         return "unknown"
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: _ncbi_genomic_record
+# ----------------------------------------------------------------------------
 def _ncbi_genomic_record(gene_id: str, common: Dict[str, str]) -> str:
     try:
         data = _get(
@@ -106,11 +152,19 @@ def _ncbi_genomic_record(gene_id: str, common: Dict[str, str]) -> str:
         return "unknown"
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: normalize_species_name
+# ----------------------------------------------------------------------------
 def normalize_species_name(organism: str) -> str:
     key = organism.strip().lower().replace("_", " ")
     return SPECIES_ALIASES.get(key, key.replace(" ", "_"))
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: parse_multifasta
+# ----------------------------------------------------------------------------
 def parse_multifasta(raw: str) -> Dict[str, str]:
     if not raw.strip():
         return {}
@@ -149,6 +203,10 @@ def parse_multifasta(raw: str) -> Dict[str, str]:
     return out
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: segments_from_ncbi_record
+# ----------------------------------------------------------------------------
 def segments_from_ncbi_record(rec) -> Tuple[List[Tuple[str, str]], List[str]]:
     """Extract independent annotated intervals, never reconstruct spliced DNA.
 
@@ -202,6 +260,10 @@ def segments_from_ncbi_record(rec) -> Tuple[List[Tuple[str, str]], List[str]]:
     return segments, warnings
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: manual_record
+# ----------------------------------------------------------------------------
 def manual_record(raw: str, gene: str = "manual_target", organism: str = "manual") -> GeneSequenceRecord:
     seqs = parse_multifasta(raw)
     if not seqs:
@@ -218,6 +280,10 @@ def manual_record(raw: str, gene: str = "manual_target", organism: str = "manual
         source_record_version="user-supplied", ambiguity_count=count, ambiguity_codes=codes,
     )
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: _get
+# ----------------------------------------------------------------------------
 def _get(url: str, *, params=None, headers=None, retries: int = 3, timeout: int = 30):
     err = None
     for attempt in range(retries):
@@ -232,6 +298,10 @@ def _get(url: str, *, params=None, headers=None, retries: int = 3, timeout: int 
     raise RuntimeError(f"Network request failed: {err}")
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: fetch_ncbi_gene
+# ----------------------------------------------------------------------------
 def fetch_ncbi_gene(gene: str, organism: str) -> GeneSequenceRecord:
     common = {"tool": NCBI_TOOL, "email": NCBI_EMAIL}
     q = f"{gene}[Gene Name] AND {organism}[Organism] AND alive[prop]"
@@ -271,6 +341,10 @@ def fetch_ncbi_gene(gene: str, organism: str) -> GeneSequenceRecord:
     )
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: fetch_ensembl_gene
+# ----------------------------------------------------------------------------
 def fetch_ensembl_gene(gene: str, organism: str) -> GeneSequenceRecord:
     species = normalize_species_name(organism)
     headers = {"Accept": "application/json", "Content-Type": "application/json", "User-Agent": NCBI_TOOL}
@@ -318,6 +392,10 @@ def fetch_ensembl_gene(gene: str, organism: str) -> GeneSequenceRecord:
     )
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: fetch_gene
+# ----------------------------------------------------------------------------
 def fetch_gene(gene: str, organism: str, source: str = "NCBI RefSeq") -> GeneSequenceRecord:
     if source.lower().startswith("ncbi"):
         return fetch_ncbi_gene(gene, organism)
