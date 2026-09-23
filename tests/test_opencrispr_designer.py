@@ -1,3 +1,32 @@
+# ============================================================================
+# TEST OPENCRISPR DESIGNER
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: This file contains automated checks for the OpenCRISPR-1 gRNA
+# Designer. The tests help make sure scientific and interface behaviour does
+# not change accidentally when the program is edited.
+#
+# HOW TO READ A TEST:
+# 1. Prepare sample input or a reusable fixture.
+# 2. Call the function or workflow being tested.
+# 3. Use assertions to compare the actual result with the expected result.
+# 4. Existing test logic and expected scientific outcomes are unchanged.
+#
+# MAIN TOP-LEVEL TESTS / HELPERS:
+# - function: test_clean_and_reverse_complement
+# - function: test_forward_ngg_discovery
+# - function: test_reverse_ngg_discovery
+# - function: test_segments_are_scanned_independently_no_junction_candidate
+# - function: test_guide_format_variants_natural_g
+# - function: test_guide_format_variants_non_g
+# - function: test_mit_exact_and_mismatch
+# - function: test_local_reference_excludes_one_intended_exact_and_keeps_second_exact
+# - function: test_local_reference_retains_near_match
+# - function: test_ambiguity_behavior_is_explicit
+# - function: test_specificity_method_is_exported_as_legacy_baseline_label
+# ============================================================================
+
 from opencrispr_designer import (
     clean_dna,
     reverse_complement,
