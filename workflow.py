@@ -1,3 +1,24 @@
+# ============================================================================
+# WORKFLOW
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: Connects the main scientific steps into one reproducible guide-design workflow.
+#
+# HOW TO READ THIS FILE:
+# 1. Start with imports and constants to see the dependencies and fixed settings.
+# 2. Read one function/class at a time rather than the whole file at once.
+# 3. Follow the workflow from sequence input -> candidate discovery -> screening -> validation.
+# 4. Scientific calculations, thresholds, validation rules and public APIs are
+#    intentionally preserved while readability explanations are added.
+#
+# MAIN TOP-LEVEL PARTS:
+# - function: guide_key
+# - function: clear_design_state
+# - function: reset_panel_if_changed
+# - function: export_bundle
+# ============================================================================
+
 """Design identity, state reset and reproducible export helpers shared by the UI."""
 from __future__ import annotations
 
@@ -11,18 +32,30 @@ from validation import validate_opencrispr_guide, validation_summary_row
 APP_VERSION = "1.4.0"
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: guide_key
+# ----------------------------------------------------------------------------
 def guide_key(record, guide) -> str:
     payload = [record.sequence_sha256, record.source_record_version, guide.segment_id,
                guide.start, guide.end, guide.strand, guide.spacer, guide.pam]
     return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: clear_design_state
+# ----------------------------------------------------------------------------
 def clear_design_state(state) -> None:
     for key in list(state):
         if key in {"oc_record", "oc_guides", "oc_settings", "oc_screens", "oc_panel_config"} or key.startswith("oc_local::"):
             del state[key]
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: reset_panel_if_changed
+# ----------------------------------------------------------------------------
 def reset_panel_if_changed(state, raw, radius, intended, display_limit) -> None:
     key = hashlib.sha256(json.dumps([raw, radius, asdict(intended) if intended else None, display_limit]).encode()).hexdigest()
     if state.get("oc_panel_config") != key:
@@ -30,6 +63,10 @@ def reset_panel_if_changed(state, raw, radius, intended, display_limit) -> None:
         state["oc_panel_config"] = key
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: export_bundle
+# ----------------------------------------------------------------------------
 def export_bundle(record, guides, screens, settings):
     rows = []
     details = []
