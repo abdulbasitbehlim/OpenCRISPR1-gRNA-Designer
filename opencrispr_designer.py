@@ -1,3 +1,36 @@
+# ============================================================================
+# OPENCRISPR DESIGNER
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: Contains the main scientific logic for discovering and ranking OpenCRISPR-1 compatible guide candidates.
+#
+# HOW TO READ THIS FILE:
+# 1. Start with imports and constants to see the dependencies and fixed settings.
+# 2. Read one function/class at a time rather than the whole file at once.
+# 3. Follow the workflow from sequence input -> candidate discovery -> screening -> validation.
+# 4. Scientific calculations, thresholds, validation rules and public APIs are
+#    intentionally preserved while readability explanations are added.
+#
+# MAIN TOP-LEVEL PARTS:
+# - class: GuideRNA
+# - class: OffTargetHit
+# - class: GuideFormat
+# - function: clean_dna
+# - function: ambiguity_summary
+# - function: reverse_complement
+# - function: gc_percent
+# - function: sequence_quality_score
+# - function: scan_opencrispr_sites
+# - function: design_from_segments
+# - function: guide_format_variants
+# - function: mismatch_positions
+# - function: mit_offtarget_pair_score
+# - function: mit_specificity
+# - function: screen_local_reference
+# - function: guide_row
+# ============================================================================
+
 #!/usr/bin/env python3
 """OpenCRISPR-1 guide spacer discovery and transparent ranking.
 
@@ -63,6 +96,10 @@ class GuideFormat:
     description: str
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: clean_dna
+# ----------------------------------------------------------------------------
 def clean_dna(raw: str) -> str:
     if not raw:
         return ""
@@ -76,6 +113,10 @@ def clean_dna(raw: str) -> str:
     return seq
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: ambiguity_summary
+# ----------------------------------------------------------------------------
 def ambiguity_summary(raw: str) -> Dict[str, object]:
     """Report IUPAC ambiguity and define how scanning handles it.
 
@@ -93,15 +134,27 @@ def ambiguity_summary(raw: str) -> Dict[str, object]:
     return {"count": len(positions), "codes": codes, "positions": positions}
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: reverse_complement
+# ----------------------------------------------------------------------------
 def reverse_complement(seq: str) -> str:
     return clean_dna(seq).translate(str.maketrans("ACGTN", "TGCAN"))[::-1]
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: gc_percent
+# ----------------------------------------------------------------------------
 def gc_percent(seq: str) -> float:
     s = clean_dna(seq)
     return 100.0 * (s.count("G") + s.count("C")) / len(s) if s else 0.0
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: sequence_quality_score
+# ----------------------------------------------------------------------------
 def sequence_quality_score(spacer: str) -> float:
     """Transparent 0-100 ranking, deliberately not called OpenCRISPR efficiency."""
     s = clean_dna(spacer)
@@ -128,6 +181,10 @@ def sequence_quality_score(spacer: str) -> float:
     return round(max(0.0, min(100.0, score)), 1)
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: scan_opencrispr_sites
+# ----------------------------------------------------------------------------
 def scan_opencrispr_sites(sequence: str, gene: str = "target", segment_id: str = "segment") -> List[GuideRNA]:
     """Discover OpenCRISPR-1-compatible 20-nt spacers with NGG PAMs on both strands."""
     seq = clean_dna(sequence)
@@ -162,6 +219,10 @@ def scan_opencrispr_sites(sequence: str, gene: str = "target", segment_id: str =
     return guides
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: design_from_segments
+# ----------------------------------------------------------------------------
 def design_from_segments(gene: str, segments: Sequence[Tuple[str, str]], max_guides: int = 50, min_score: float = 0.0) -> List[GuideRNA]:
     if max_guides < 1 or not 0 <= min_score <= 100:
         raise ValueError("Use a positive guide count and a score from 0 to 100.")
@@ -181,6 +242,10 @@ def design_from_segments(gene: str, segments: Sequence[Tuple[str, str]], max_gui
     return out[:max_guides]
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: guide_format_variants
+# ----------------------------------------------------------------------------
 def guide_format_variants(spacer: str) -> List[GuideFormat]:
     """Return common 5'-G guide-expression formats explicitly evaluated in a 2026 OpenCRISPR study."""
     s = clean_dna(spacer)
@@ -206,6 +271,10 @@ def guide_format_variants(spacer: str) -> List[GuideFormat]:
     return variants
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: mismatch_positions
+# ----------------------------------------------------------------------------
 def mismatch_positions(a: str, b: str) -> Tuple[int, ...]:
     a, b = clean_dna(a), clean_dna(b)
     if len(a) != 20 or len(b) != 20:
@@ -213,6 +282,10 @@ def mismatch_positions(a: str, b: str) -> Tuple[int, ...]:
     return tuple(i + 1 for i, (x, y) in enumerate(zip(a, b)) if x != y)
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: mit_offtarget_pair_score
+# ----------------------------------------------------------------------------
 def mit_offtarget_pair_score(guide: str, target: str) -> float:
     pos = mismatch_positions(guide, target)
     if not pos:
@@ -225,10 +298,18 @@ def mit_offtarget_pair_score(guide: str, target: str) -> float:
     return max(0.0, min(1.0, term * (1 / (m * m)) * (1 / ((((19 - d) / 19) * 4) + 1))))
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: mit_specificity
+# ----------------------------------------------------------------------------
 def mit_specificity(pair_scores: Iterable[float]) -> float:
     return round(100.0 / (1.0 + sum(pair_scores)), 2)
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: screen_local_reference
+# ----------------------------------------------------------------------------
 def screen_local_reference(
     guide: str,
     panel: Mapping[str, str],
@@ -249,6 +330,10 @@ def screen_local_reference(
     return result.specificity_score, list(result.hits)
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: guide_row
+# ----------------------------------------------------------------------------
 def guide_row(g: GuideRNA) -> Dict[str, object]:
     return {
         "Spacer (20 nt)": g.spacer,
