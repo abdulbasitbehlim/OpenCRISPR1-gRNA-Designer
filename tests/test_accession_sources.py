@@ -1,26 +1,3 @@
-# ============================================================================
-# TEST ACCESSION SOURCES
-# BEGINNER-FRIENDLY CODE GUIDE
-# ============================================================================
-#
-# PURPOSE: This file contains automated checks for the OpenCRISPR-1 gRNA
-# Designer. The tests help make sure scientific and interface behaviour does
-# not change accidentally when the program is edited.
-#
-# HOW TO READ A TEST:
-# 1. Prepare sample input or a reusable fixture.
-# 2. Call the function or workflow being tested.
-# 3. Use assertions to compare the actual result with the expected result.
-# 4. Existing test logic and expected scientific outcomes are unchanged.
-#
-# MAIN TOP-LEVEL TESTS / HELPERS:
-# - class: FakeResponse
-# - function: _gb_text
-# - function: test_fetch_ncbi_accession
-# - function: test_fetch_ensembl_transcript_accession
-# - function: test_fetch_accession_routes_and_rejects
-# ============================================================================
-
 from io import StringIO
 
 import pytest

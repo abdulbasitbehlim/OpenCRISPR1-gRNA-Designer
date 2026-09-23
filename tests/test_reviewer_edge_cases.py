@@ -1,26 +1,3 @@
-# ============================================================================
-# TEST REVIEWER EDGE CASES
-# BEGINNER-FRIENDLY CODE GUIDE
-# ============================================================================
-#
-# PURPOSE: This file contains automated checks for the OpenCRISPR-1 gRNA
-# Designer. The tests help make sure scientific and interface behaviour does
-# not change accidentally when the program is edited.
-#
-# HOW TO READ A TEST:
-# 1. Prepare sample input or a reusable fixture.
-# 2. Call the function or workflow being tested.
-# 3. Use assertions to compare the actual result with the expected result.
-# 4. Existing test logic and expected scientific outcomes are unchanged.
-#
-# MAIN TOP-LEVEL TESTS / HELPERS:
-# - function: test_no_valid_pam_returns_empty
-# - function: test_iupac_in_candidate_window_is_skipped
-# - function: test_single_gene_input_is_supported
-# - function: test_unrelated_sequence_has_no_false_exact_candidate
-# - function: test_exon_junction_avoidance_explicitly
-# ============================================================================
-
 import pytest
 from opencrispr_designer import scan_opencrispr_sites, design_from_segments, clean_dna
 

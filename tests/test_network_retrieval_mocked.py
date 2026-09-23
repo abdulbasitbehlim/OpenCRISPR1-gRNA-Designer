@@ -1,30 +1,3 @@
-# ============================================================================
-# TEST NETWORK RETRIEVAL MOCKED
-# BEGINNER-FRIENDLY CODE GUIDE
-# ============================================================================
-#
-# PURPOSE: This file contains automated checks for the OpenCRISPR-1 gRNA
-# Designer. The tests help make sure scientific and interface behaviour does
-# not change accidentally when the program is edited.
-#
-# HOW TO READ A TEST:
-# 1. Prepare sample input or a reusable fixture.
-# 2. Call the function or workflow being tested.
-# 3. Use assertions to compare the actual result with the expected result.
-# 4. Existing test logic and expected scientific outcomes are unchanged.
-#
-# MAIN TOP-LEVEL TESTS / HELPERS:
-# - class: FakeResponse
-# - function: _genbank_text
-# - function: test_fetch_ncbi_gene_mocked_preserves_version_assembly_and_exons
-# - function: test_fetch_ncbi_gene_rejects_transcript_without_exon_boundaries
-# - function: test_fetch_ncbi_gene_error_branches
-# - function: test_fetch_ensembl_gene_mocked_release_and_ambiguity
-# - function: test_fetch_ensembl_gene_error_branches
-# - function: test_fetch_gene_routes_and_rejects_unknown
-# - function: test_get_retry_success_and_failure
-# ============================================================================
-
 from io import StringIO
 
 import pytest
