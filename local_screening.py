@@ -1,3 +1,29 @@
+# ============================================================================
+# LOCAL SCREENING
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: Performs local-reference screening used to review possible guide specificity concerns.
+#
+# HOW TO READ THIS FILE:
+# 1. Start with imports and constants to see the dependencies and fixed settings.
+# 2. Read one function/class at a time rather than the whole file at once.
+# 3. Follow the workflow from sequence input -> candidate discovery -> screening -> validation.
+# 4. Scientific calculations, thresholds, validation rules and public APIs are
+#    intentionally preserved while readability explanations are added.
+#
+# MAIN TOP-LEVEL PARTS:
+# - class: TargetLocus
+# - class: PanelSite
+# - class: PanelScreen
+# - function: normalize_panel
+# - function: panel_fingerprint
+# - function: iter_panel_sites
+# - function: exact_target_loci
+# - function: _resolved_guide
+# - function: screen_reference
+# ============================================================================
+
 """Bounded, coordinate-aware NGG panel screening, not genome-wide prediction.
 
 Only the display is capped. Counts and the legacy MIT summary include every
@@ -70,6 +96,10 @@ class PanelScreen:
                 "coordinate_system": "1-based inclusive; leftmost spacer base on supplied contig"}
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: normalize_panel
+# ----------------------------------------------------------------------------
 def normalize_panel(panel: Mapping[str, str]) -> dict[str, str]:
     if not panel:
         raise ValueError("Supply a non-empty reference FASTA panel.")
@@ -86,10 +116,18 @@ def normalize_panel(panel: Mapping[str, str]) -> dict[str, str]:
     return out
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: panel_fingerprint
+# ----------------------------------------------------------------------------
 def panel_fingerprint(panel: Mapping[str, str]) -> str:
     return hashlib.sha256(json.dumps(sorted(panel.items()), separators=(",", ":")).encode()).hexdigest()
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: iter_panel_sites
+# ----------------------------------------------------------------------------
 def iter_panel_sites(panel: Mapping[str, str]):
     """Yield sites without calculating sequence-quality scores or sorting a genome."""
     for name, seq in panel.items():
@@ -101,11 +139,19 @@ def iter_panel_sites(panel: Mapping[str, str]):
                 yield PanelSite(name, i + 4, "-", reverse_complement(window[3:]), reverse_complement(window[:3]))
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: exact_target_loci
+# ----------------------------------------------------------------------------
 def exact_target_loci(guide: str, panel: Mapping[str, str]) -> list[TargetLocus]:
     g = _resolved_guide(guide)
     return [s.locus for s in iter_panel_sites(normalize_panel(panel)) if s.spacer == g]
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: _resolved_guide
+# ----------------------------------------------------------------------------
 def _resolved_guide(guide: str) -> str:
     g = clean_dna(guide)
     if len(g) != 20 or "N" in g:
@@ -113,6 +159,10 @@ def _resolved_guide(guide: str) -> str:
     return g
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: screen_reference
+# ----------------------------------------------------------------------------
 def screen_reference(
     guide: str, panel: Mapping[str, str], max_mismatches: int = 3,
     intended_locus: TargetLocus | None = None, max_hits: int = 250,
