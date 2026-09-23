@@ -1,3 +1,25 @@
+# ============================================================================
+# VALIDATION
+# BEGINNER-FRIENDLY CODE GUIDE
+# ============================================================================
+#
+# PURPOSE: Applies explicit validation rules to guide-design inputs and outputs.
+#
+# HOW TO READ THIS FILE:
+# 1. Start with imports and constants to see the dependencies and fixed settings.
+# 2. Read one function/class at a time rather than the whole file at once.
+# 3. Follow the workflow from sequence input -> candidate discovery -> screening -> validation.
+# 4. Scientific calculations, thresholds, validation rules and public APIs are
+#    intentionally preserved while readability explanations are added.
+#
+# MAIN TOP-LEVEL PARTS:
+# - class: ValidationCheck
+# - class: ValidationReport
+# - function: _add
+# - function: validate_opencrispr_guide
+# - function: validation_summary_row
+# ============================================================================
+
 #!/usr/bin/env python3
 """Validation rules for OpenCRISPR-1 gRNA Designer.
 
@@ -40,10 +62,18 @@ class ValidationReport:
         return "; ".join(msgs) if msgs else "None"
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: _add
+# ----------------------------------------------------------------------------
 def _add(checks: List[ValidationCheck], name: str, status: str, value: object, explanation: str) -> None:
     checks.append(ValidationCheck(name, status, str(value), explanation))
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: validate_opencrispr_guide
+# ----------------------------------------------------------------------------
 def validate_opencrispr_guide(
     guide: GuideRNA,
     min_sequence_score: float = 35.0,
@@ -204,6 +234,10 @@ def validate_opencrispr_guide(
     return ValidationReport(status, tuple(checks), pass_count, review_count, fail_count, specificity_status)
 
 
+
+# ----------------------------------------------------------------------------
+# FUNCTION / CLASS SECTION: validation_summary_row
+# ----------------------------------------------------------------------------
 def validation_summary_row(report: ValidationReport) -> dict:
     return {
         "Validation": report.status,
